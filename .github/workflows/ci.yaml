@@ -55,8 +55,10 @@ jobs:
 
       # uv.lock is the exact resolution the wall host gets, win32 markers
       # included. `uv sync` installs from it; pyproject.toml stays the contract.
+      # --extra dev pulls in pytest (and ruff, unused by this job but harmless)
+      # from the dev optional-dependency group -- core alone has no test runner.
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --extra dev
 
       # opencv-python needs libGL, which no headless runner has. Without this
       # the cv2-dependent tests skip correctly (they no longer error -- see
