@@ -11,7 +11,7 @@
 param([switch]$NoPause)
 
 $ErrorActionPreference = 'SilentlyContinue'
-try { $Host.UI.RawUI.WindowTitle = "Living Portraits Launcher" } catch {}
+try { $Host.UI.RawUI.WindowTitle = "Living Portraits Launcher" } catch { Write-Verbose "window title unset in this host; harmless" }
 function Line($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 
 Line "===============================================" Cyan

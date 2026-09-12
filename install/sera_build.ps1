@@ -9,7 +9,7 @@ Write-Output "=== pause director + unload qwen3 (free GPU for SD1.5) ==="
 Get-CimInstance Win32_Process -Filter "Name='pythonw.exe'" |
     Where-Object { $_.CommandLine -like '*stage_manager.py*' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-try { ollama stop qwen3:8b } catch {}
+try { ollama stop qwen3:8b } catch { Write-Verbose "ollama already stopped or unavailable; harmless" }
 Start-Sleep -Seconds 2
 
 Write-Output "=== render seraphina portrait (SD1.5, .venv-gen) ==="
