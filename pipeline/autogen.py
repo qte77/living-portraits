@@ -403,13 +403,12 @@ def plan(p):
     for el in p.get("extra_links", []) or []:
         extra_motions += [el.get("motion", ""), el.get("reverse_motion", "")]
     verdict = mj_safe.check(p["still_prompt"],
-                            motion=" ".join([p.get("transition_motion", ""), p.get("reverse_motion", "")]
-                                            + idle_motions + extra_motions),
+                            motion=" ".join([p.get("transition_motion", ""), p.get("reverse_motion", ""), *idle_motions, *extra_motions]),
                             negatives=p.get("negatives"))
     return verdict, {"hub": hub, "fwd": fwd, "rev": rev}
 
 
-def generate_one(p, *, dry_run=False, log=print):
+def generate_one(p, *, dry_run=False, log=print):  # noqa: PLR0912, PLR0915  -- the MJ generate path end to end: budget gate, prompt build, model call, verify gate, record. It spends money, so it stays readable top to bottom, same call as heartbeat.py's propose_pose.
     """Generate one approved proposal end-to-end. Returns True on success."""
     char, label = p["character"], p["label"]
     _t0 = time.time()
@@ -577,7 +576,10 @@ def _rebuild_graph(log=print):
     run. (In-process video_graph.build() derives from NODE_SPECS/EDGE_SPECS frozen at IMPORT
     time -- before this pose existed -- so it would silently omit it; matches how the bedtime
     poses build, via a fresh CLI process.) Raises on a walk-safety failure."""
-    r = subprocess.run([sys.executable, str(ROOT / "runtime" / "video_graph.py"), "build"],
+    # returncode is checked explicitly below to log the first output line, then raise a
+    # build-specific RuntimeError carrying the captured stderr; check=True would raise
+    # CalledProcessError before either of those runs.
+    r = subprocess.run([sys.executable, str(ROOT / "runtime" / "video_graph.py"), "build"],  # noqa: PLW1510 -- see above
                        cwd=str(ROOT), capture_output=True, text=True)
     out = (r.stdout or "").strip().splitlines()
     log("  graph build: " + (out[0] if out else "(no output)"))
@@ -628,13 +630,20 @@ def _generate_extra_links(client, g, char, label, new_url, extra_links, log):
 def _record_pose(p, hub, fwd, rev, extra_links=None):
     char, label = p["character"], p["label"]
     ag = _load(AUTOGEN, {"characters": {}})
+    # A full-dict replacement here would silently wipe extra_links something else
+    # (scripts/unstick.py) already recorded for this label, if this pose is ever
+    # re-recorded after that -- merge by sibling instead of overwriting (issue #44).
+    prior = (ag.get("characters", {}).get(char, {}).get("poses", {}).get(label, {})
+               .get("extra_links") or [])
+    merged = {el["sibling"]: el for el in prior if el.get("sibling")}
+    merged.update({el["sibling"]: el for el in (extra_links or []) if el.get("sibling")})
     ag.setdefault("characters", {}).setdefault(char, {}).setdefault("poses", {})[label] = {
         "node_image": "data/gen/%s_%s.png" % (char, label),
         "still_prompt": p["still_prompt"],
         "hub": hub,
         "transition": {"label": fwd, "reverse_label": rev, "motion": p.get("transition_motion", "")},
         "idles": [{"id": i["id"], "motion": i.get("motion", "")} for i in p.get("idles", [])],
-        "extra_links": extra_links or [],
+        "extra_links": list(merged.values()),
     }
     _save(AUTOGEN, ag)
 
@@ -711,7 +720,7 @@ def _release_lock():
         pass
 
 
-def generate_one_hf(p, *, dry_run=False, log=print):
+def generate_one_hf(p, *, dry_run=False, log=print):  # noqa: PLR0912, PLR0915  -- the Higgsfield generate path end to end: per-clip budget gate, resume logic, model calls, verify gate, record. It spends money, so it stays readable top to bottom, same call as heartbeat.py's propose_pose.
     """Generate one approved proposal via HIGGSFIELD. Returns True on success.
 
     Differs from the MJ path in three ways that matter:
@@ -939,7 +948,7 @@ def generate_one_hf(p, *, dry_run=False, log=print):
         return False
 
 
-def run_generate(dry_run=False, limit=None, log=print, auto=True):
+def run_generate(dry_run=False, limit=None, log=print, auto=True):  # noqa: PLR0912  -- the autonomous generation loop: picks a proposal, routes it to the MJ or Higgsfield path, enforces the rails (budget/cooldown/lock) between attempts. The branches ARE the loop's contract, same call as heartbeat.py's tick.
     # AUTONOMOUS BY DEFAULT (2026-08-09). The portraits generate what they want without
     # asking: `pending` proposals are generated alongside `approved` ones, so nothing waits
     # on a human.
@@ -1007,7 +1016,7 @@ def _fmt(p):
                                           p.get("reason", "")[:60], p["id"])
 
 
-def _status_report():
+def _status_report():  # noqa: PLR0912, PLR0915  -- one dashboard, one screen: each branch is an independent report line-item (tasks, telemetry, queue, graph, lock, budget). Splitting it would multiply file traversal without making any single line clearer.
     """One-screen health view of the autogen pose-growth pipeline: scheduled tasks, the
     generation telemetry (last success / last attempt / 24h outcomes / top failures), the
     queue, the graph, the lock state, budget + cooldown -- with STUCK/STALE alerts."""
@@ -1020,7 +1029,7 @@ def _status_report():
     for t in ("lp-gen", "lp-mind", "lp-preview", "lp-watchdog-preview", "OllamaServe"):
         try:
             r = subprocess.run(["schtasks", "/query", "/TN", t, "/FO", "LIST"],
-                               capture_output=True, text=True, timeout=10)
+                               capture_output=True, text=True, timeout=10, check=True)
             st = next((ln.split(":", 1)[1].strip() for ln in r.stdout.splitlines()
                        if ln.strip().lower().startswith("status")), "?")
             if r.returncode == 0:
@@ -1028,7 +1037,8 @@ def _status_report():
         except Exception:
             pass
     if tlines:
-        out.append("TASKS:"); out.extend(tlines)
+        out.append("TASKS:")
+        out.extend(tlines)
 
     # generation telemetry
     events = []
@@ -1051,7 +1061,8 @@ def _status_report():
     dones = [e for e in gens if e.get("outcome") == "done"]
     out.append("GENERATION:")
     if dones:
-        ld = dones[-1]; a = _age(ld)
+        ld = dones[-1]
+        a = _age(ld)
         out.append("  last SUCCESS: %s:%s  %s  (%s)" % (
             ld.get("char"), ld.get("label"), ld["ts"], ("%.1fh ago" % (a / 3600)) if a else "?"))
         if a and a > 6 * 3600:
@@ -1119,27 +1130,36 @@ def main():
     sub = ap.add_subparsers(dest="cmd")
     sub.add_parser("list")
     sub.add_parser("review")
-    a = sub.add_parser("approve"); a.add_argument("id")
-    r = sub.add_parser("reject"); r.add_argument("id")
-    g = sub.add_parser("generate"); g.add_argument("--dry-run", action="store_true"); g.add_argument("--limit", type=int)
+    a = sub.add_parser("approve")
+    a.add_argument("id")
+    r = sub.add_parser("reject")
+    r.add_argument("id")
+    g = sub.add_parser("generate")
+    g.add_argument("--dry-run", action="store_true")
+    g.add_argument("--limit", type=int)
     g.add_argument("--auto", action="store_true", default=True,
                    help="(default) AUTONOMOUS: generate pending proposals with no human approval")
     g.add_argument("--gated", dest="auto", action="store_false",
                    help="put the human back in front: generate ONLY human-approved proposals")
     sub.add_parser("status")
     pr = sub.add_parser("propose")          # manual proposal (testing)
-    pr.add_argument("--character", required=True); pr.add_argument("--label", required=True)
-    pr.add_argument("--still", required=True); pr.add_argument("--hub", default="anchor")
-    pr.add_argument("--transition", default=""); pr.add_argument("--idle", action="append", default=[])
+    pr.add_argument("--character", required=True)
+    pr.add_argument("--label", required=True)
+    pr.add_argument("--still", required=True)
+    pr.add_argument("--hub", default="anchor")
+    pr.add_argument("--transition", default="")
+    pr.add_argument("--idle", action="append", default=[])
     args = ap.parse_args()
 
     if args.cmd in ("list", "review"):
         for p in load_proposals()["proposals"]:
             print(_fmt(p))
     elif args.cmd == "approve":
-        set_status(args.id, "approved"); print("approved", args.id)
+        set_status(args.id, "approved")
+        print("approved", args.id)
     elif args.cmd == "reject":
-        set_status(args.id, "rejected"); print("rejected", args.id)
+        set_status(args.id, "rejected")
+        print("rejected", args.id)
     elif args.cmd == "generate":
         logf = open(ROOT / "_autogen.log", "a", buffering=1, encoding="utf-8", errors="replace")
 

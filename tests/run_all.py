@@ -100,7 +100,12 @@ class _PytestShim:
         return _Raises(exc)
 
     @staticmethod
-    def skip(reason=""):
+    def skip(reason="", **kw):
+        # Real pytest.skip() accepts allow_module_level=True (test_verify.py:36 passes
+        # it); without **kw here that call raised TypeError instead of Skipped, so this
+        # shim exited 1 without cv2 where real pytest exits 0 -- and the purpose-built
+        # skip below never ran, because both `except` arms above it caught the TypeError
+        # first (issue #44).
         raise Skipped(reason)
 
     @staticmethod

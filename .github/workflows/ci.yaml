@@ -213,11 +213,11 @@ jobs:
       # [tool.ruff.lint].ignore with counts, so they cannot grow silently while
       # the gate stays green.
       - name: Lint
-        run: uvx ruff@0.16.6 check runtime director scripts health tests gallery.py player.py
+        run: uvx ruff@0.16.6 check runtime director scripts health tests gallery.py player.py pipeline _preview_graph.py
 
       - name: Formatting drift (advisory)
         continue-on-error: true
-        run: uvx ruff@0.16.6 format --diff runtime director scripts health
+        run: uvx ruff@0.16.6 format --diff runtime director scripts health pipeline _preview_graph.py
 
   security:
     name: security scan (bandit + pip-audit)

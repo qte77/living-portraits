@@ -33,7 +33,6 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 import cv2
 import numpy as np
@@ -84,7 +83,7 @@ def _bbox_from_alpha(alpha: np.ndarray) -> tuple[int, int, int, int]:
 
 
 def _detect_face(rgb: np.ndarray, fig_box: tuple[int, int, int, int]
-                 ) -> Optional[tuple[int, int, int, int]]:
+                 ) -> tuple[int, int, int, int] | None:
     """Frontal-face Haar detection, restricted to the figure bbox. Returns the
     largest face (x, y, w, h) in full-image coords, or None if none fire.
 
@@ -102,7 +101,7 @@ def _detect_face(rgb: np.ndarray, fig_box: tuple[int, int, int, int]
         return None
     if len(faces) == 0:
         return None
-    fx, fy, fw, fh = fig_box
+    fx, fy, fw, _fh = fig_box
     inside = [f for f in faces
               if fx - 10 <= f[0] and f[1] >= fy - 10
               and f[0] + f[2] <= fx + fw + 10]
@@ -112,7 +111,7 @@ def _detect_face(rgb: np.ndarray, fig_box: tuple[int, int, int, int]
 
 
 def _detect_eyes(rgb: np.ndarray, head_box: tuple[int, int, int, int]
-                 ) -> Optional[list[tuple[int, int, int, int]]]:
+                 ) -> list[tuple[int, int, int, int]] | None:
     """Eye Haar detection within the head box. Returns up to two eye boxes in
     full-image coords, or None. Best effort -- proportional defaults cover the
     miss case."""
@@ -199,7 +198,7 @@ def _warp_params(fig_box, head_box, regions) -> dict:
     Gaze  -- pupil/iris translation range + head-turn yaw/pitch in degrees.
     Blink -- eyelid close, the alpha-scale + cycle timing for the eye regions.
     """
-    fw, fh = fig_box[2], fig_box[3]
+    _fw, fh = fig_box[2], fig_box[3]
     hw, hh = head_box[2], head_box[3]
     return {
         "idle": {
@@ -270,7 +269,7 @@ def _deform_layers(regions, head_box) -> list:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def build_rig_spec(cutout_path, out_dir: Optional[Path] = None) -> dict:
+def build_rig_spec(cutout_path, out_dir: Path | None = None) -> dict:
     """Build a Live2D-style rig spec from a character cutout RGBA.
 
     Args:

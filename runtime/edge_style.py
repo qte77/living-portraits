@@ -53,6 +53,10 @@ from __future__ import annotations
 
 import re
 from collections import Counter, namedtuple
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 # --- the closed vocabulary. Chosen by reading the 704 real transition prompts in
 # data/_realdata/video_graph.json, not by imagining what a motion prompt looks like.
@@ -79,7 +83,7 @@ WEAK = 1.0     # a supporting word that only counts alongside others ("slowly", 
 MIN_SCORE = 2.0   # below this the prose has not named a manner -> None, not a bucket
 
 
-def _cues(strong, weak):
+def _cues(strong: str, weak: str) -> dict[str, float]:
     d = dict.fromkeys(strong.split(), STRONG)
     for w in weak.split():
         d.setdefault(w, WEAK)
@@ -209,7 +213,7 @@ Style = namedtuple("Style", "manner valence score")
 NEUTRAL = Style(None, 0.0, 0.0)
 
 
-def strip_reverse(text):
+def strip_reverse(text: str | None) -> tuple[str, bool]:
     """(prose without the '(reverse ...)' marker, was_marked). The marker is a pipeline
     annotation, never part of the motion description, so it must not reach the cues."""
     s = str(text or "").strip()
@@ -217,7 +221,7 @@ def strip_reverse(text):
     return (s[m.end():].strip(), True) if m else (s, False)
 
 
-def _scores(text):
+def _scores(text: str | None) -> dict[str, float]:
     counts = Counter(_WORD.findall(str(text or "").lower()))
     out = {}
     for manner, cues in CUES.items():
@@ -230,7 +234,7 @@ def _scores(text):
     return out
 
 
-def _affect(text):
+def _affect(text: str | None) -> float:
     counts = Counter(_WORD.findall(str(text or "").lower()))
     adj = 0.0
     for weight, words in AFFECT.items():
@@ -240,7 +244,7 @@ def _affect(text):
     return max(-AFFECT_CAP, min(AFFECT_CAP, adj))
 
 
-def derive(motion_prompt):
+def derive(motion_prompt: str | None) -> Style:
     """Style for ONE piece of motion prose, read literally as written.
 
     No graph context, so no reverse-prose correction -- see `index()` for that. Prose
@@ -258,7 +262,7 @@ def derive(motion_prompt):
     return Style(manner, max(-1.0, min(1.0, valence)), best)
 
 
-def invert(style):
+def invert(style: Style | None) -> Style:
     """The same clip seen playing the other way: directional manners flip, the rest are
     their own inverse, and the valence follows the manner it now has."""
     if not style or not style.manner:
@@ -270,14 +274,14 @@ def invert(style):
     return Style(manner, max(-1.0, min(1.0, style.valence + shift)), style.score)
 
 
-def for_edge(edge):
+def for_edge(edge: dict | None) -> Style:
     """Style from one edge in isolation. Convenience over `derive`; carries the same
     caveat -- a reverse edge whose prose was copied from its twin reads backwards here.
     Prefer `index()` on a whole graph."""
     return derive((edge or {}).get("motion_prompt"))
 
 
-def _copied_prose_ids(edges):
+def _copied_prose_ids(edges: Iterable[dict]) -> set[str]:
     """Edge ids whose prose is PROVABLY their twin's, so their manner must be inverted.
 
     Proof, not heuristic: the edge carries the `(reverse)` marker AND an unmarked edge
@@ -302,7 +306,7 @@ def _copied_prose_ids(edges):
     return out
 
 
-def index(edges):
+def index(edges: Iterable[dict] | None) -> dict[str, Style]:
     """{edge_id: Style} over a whole graph, reverse-prose corrected. THE entry point.
 
     Only typed edges appear, so a plain `.get(id)` returns None for everything this
@@ -323,7 +327,7 @@ def index(edges):
     return out
 
 
-def histogram(styles):
+def histogram(styles: dict[str, Style] | Iterable[object] | None) -> Counter:
     """Counter over manners, for the coverage report. Accepts an `index()` result, an
     iterable of Style, or raw edges."""
     if isinstance(styles, dict):
@@ -333,7 +337,7 @@ def histogram(styles):
     return Counter(s.manner for s in values if getattr(s, "manner", None))
 
 
-def affinity(style, band, strength=1.0):
+def affinity(style: Style | None, band: str | None, strength: float = 1.0) -> float:
     """How much this band WANTS this manner, as a bounded multiplier on the edge weight.
 
     1.0 -- exactly no opinion -- whenever the edge has no manner, the band is unknown, or
@@ -357,7 +361,7 @@ def affinity(style, band, strength=1.0):
     return max(STYLE_FLOOR, min(STYLE_CEIL, mult))
 
 
-def coverage(edges):
+def coverage(edges: Iterable[dict] | None) -> dict:
     """{n, typed, untyped, share, by_kind, manners} -- the honesty report, computed from
     whatever graph you hand it rather than quoted from a README."""
     edges = list(edges or ())

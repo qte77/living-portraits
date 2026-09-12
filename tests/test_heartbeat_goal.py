@@ -9,6 +9,7 @@ Pure function, no graph / no network / no LLM.
 """
 import pytest
 
+from director import heartbeat as hb
 from director.heartbeat import _resolve_goal
 
 ALLOWED = {
@@ -55,3 +56,26 @@ def test_resolution_is_deterministic_across_calls():
     first = _resolve_goal("withered_rose", "phineas", ALLOWED)
     for _ in range(20):
         assert _resolve_goal("withered_rose", "phineas", ALLOWED) == first
+
+
+# --------------------------------------------------------------- _neighbour_lines (#9)
+# A bare `except: continue` used to skip a corrupt/unreadable neighbour pose.json with
+# no trace, indistinguishable from "that panel has nothing to say". Fail-open stays --
+# one bad neighbour must not blank the whole awareness line -- but the reason must
+# surface now (same pattern as PR #38's provenance fixes).
+
+def test_neighbour_lines_reports_a_bad_file_and_skips_it(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(hb, "POSE_DIR", tmp_path)
+    (tmp_path / "maxx.json").write_text("{not valid json", encoding="utf-8")
+    out = hb._neighbour_lines("phineas")
+    assert out == []                      # fail-open: the bad neighbour is skipped, not raised
+    printed = capsys.readouterr().out
+    assert "maxx" in printed and "_neighbour_lines" in printed
+
+
+def test_neighbour_lines_says_nothing_when_it_works(tmp_path, monkeypatch, capsys):
+    """An error line on the happy path would train everyone to ignore it."""
+    monkeypatch.setattr(hb, "POSE_DIR", tmp_path)
+    out = hb._neighbour_lines("phineas")  # no neighbour files at all -> just no lines
+    assert out == []
+    assert capsys.readouterr().out == ""

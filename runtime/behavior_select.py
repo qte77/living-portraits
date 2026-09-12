@@ -278,7 +278,11 @@ def _iter_clips(source: Any) -> list[Any]:
     if callable(edges):
         try:
             return list(edges())
-        except Exception:
+        except Exception as e:
+            # "Never raises" is the contract, but a graph whose .edges() is broken
+            # is a real bug, not an unrecognised shape -- the two used to look
+            # identical from here (both silently yielded []).
+            print("_iter_clips: source.edges() raised -- %r" % (e,), flush=True)
             return []
     # A single clip handed in directly (duck-typed: it has tags).
     if hasattr(source, "tags") and not isinstance(source, (list, tuple, set)):
@@ -287,7 +291,8 @@ def _iter_clips(source: Any) -> list[Any]:
     if isinstance(source, Iterable):
         try:
             return list(source)
-        except Exception:
+        except Exception as e:
+            print("_iter_clips: iterating source raised -- %r" % (e,), flush=True)
             return []
     return []
 

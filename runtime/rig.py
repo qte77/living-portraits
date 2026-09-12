@@ -59,10 +59,13 @@ import math
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
-from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 ROOT = Path(__file__).resolve().parent.parent
 GEN_DIR = ROOT / "data" / "gen"

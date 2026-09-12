@@ -604,7 +604,6 @@ def _selftest() -> int:  # noqa: PLR0915  -- module self-test: a flat sequence o
     assert int(corner.sum()) == 0, "B dead-corner is not black (layout wrong)"
 
     # ---- motion: rig idle changes the panels over time ----------------------
-    stage.render_canvas(plan[min(len(plan) - 1, first_walk // 2)])
     walk_canvases = [stage.render_canvas(pf) for pf in plan[first_walk:last_walk + 1]]
     # idle-to-idle should differ (blink/breathe/gaze) OR walk should differ from
     # idle -- assert the stronger, easy claim: the walk frames are not all equal.

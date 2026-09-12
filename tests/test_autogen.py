@@ -177,6 +177,29 @@ def test_record_pose_persists_extra_links(tmp_path, monkeypatch):
     assert saved["extra_links"] == links
 
 
+def test_record_pose_merges_extra_links_on_re_record(tmp_path, monkeypatch):
+    """A re-record (e.g. a retry) must not silently drop a link something else already
+    recorded for this label (issue #44) -- extra_links merges by sibling, not overwrites."""
+    monkeypatch.setattr(autogen, "AUTOGEN", tmp_path / "autogen_poses.json")
+    p = {"character": "phineas", "label": "reading", "still_prompt": "x",
+         "transition_motion": "m", "idles": [{"id": "reading_0", "motion": "i"}]}
+    first = [{"sibling": "glower", "label": "glower_to_reading",
+              "reverse_label": "reading_to_glower", "motion": "lm"}]
+    autogen._record_pose(p, "anchor", "anchor_to_reading", "reading_to_anchor", first)
+
+    # Simulate scripts/unstick.py adding a second link outside _record_pose's path.
+    store = autogen._load(autogen.AUTOGEN, {})
+    store["characters"]["phineas"]["poses"]["reading"]["extra_links"].append(
+        {"sibling": "swoon", "label": "swoon_to_reading",
+         "reverse_label": "reading_to_swoon", "motion": "sm"})
+    autogen._save(autogen.AUTOGEN, store)
+
+    # Re-record the SAME pose with no extra_links of its own -- both prior links must survive.
+    autogen._record_pose(p, "anchor", "anchor_to_reading", "reading_to_anchor")
+    saved = autogen._load(autogen.AUTOGEN, {})["characters"]["phineas"]["poses"]["reading"]
+    assert {el["sibling"] for el in saved["extra_links"]} == {"glower", "swoon"}
+
+
 # ------------------------------------------------------------ proposal-side connectivity
 
 def _fake_graph():

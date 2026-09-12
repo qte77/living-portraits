@@ -232,6 +232,18 @@ def test_signal_headlines_empty_on_total_failure(feeds_paths, monkeypatch):
     assert feeds.signal_headlines() == []
 
 
+def test_signal_headlines_reports_why_it_failed(feeds_paths, monkeypatch, capsys):
+    """A total fetch failure used to look identical to 'no signal issue yet' -- both
+    returned []. Fail-open stays (see #9), but the reason must now surface somewhere."""
+    def _boom(*a, **k):
+        raise RuntimeError("feed down")
+
+    monkeypatch.setattr(feeds, "_get_json", _boom)
+    assert feeds.signal_headlines() == []
+    out = capsys.readouterr().out
+    assert "feed down" in out
+
+
 def test_weather_today_formats_phrase_and_temp(feeds_paths, monkeypatch):
     monkeypatch.setattr(feeds, "_get_json",
                         lambda *a, **k: {"current": {"temperature_2m": 61.4, "weather_code": 3}})

@@ -39,6 +39,10 @@ import json
 import os
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 ROOT = Path(__file__).resolve().parent.parent
 LIVED_DIR = ROOT / "data" / "mind" / "lived"
@@ -48,14 +52,15 @@ FLUSH_EVERY = 60.0     # seconds; the walker updates memory constantly, disk rar
 MAX_MOODS = 12         # per node: keep the most-brought bands, not an unbounded histogram
 
 
-def path_for(character, base=None):
+def path_for(character: str, base: str | Path | None = None) -> Path:
     return (Path(base) if base else LIVED_DIR) / ("%s.json" % character)
 
 
 class Lived:
     """One character's lived record. The WALKER owns the instance and is its sole writer."""
 
-    def __init__(self, character, base=None, now=None):
+    def __init__(self, character: str, base: str | Path | None = None,
+                 now: float | None = None) -> None:
         self.character = character
         self.path = path_for(character, base)
         self._last_flush = (time.time() if now is None else now)
@@ -71,7 +76,7 @@ class Lived:
                        if k not in ("schema", "character", "updated", "nodes", "edges")}
 
     # ---------------------------------------------------------------- writes
-    def visit(self, node, mood_band=None, now=None):
+    def visit(self, node: str, mood_band: str | None = None, now: float | None = None) -> None:
         """Arrived at a pose. First arrival stamps `first` -- the moment this pose entered
         the character's life, which the graph itself cannot express."""
         now = time.time() if now is None else now
@@ -88,14 +93,14 @@ class Lived:
                 rec["moods"] = dict(sorted(moods.items(), key=lambda kv: -kv[1])[:MAX_MOODS])
         self._dirty = True
 
-    def tick_dwell(self, node, n=1, now=None):
+    def tick_dwell(self, node: str, n: int = 1, now: float | None = None) -> None:
         """One more idle unit spent here. Cheap: no timestamp write on the hot path."""
         rec = self.nodes.setdefault(
             node, {"visits": 0, "first": (time.time() if now is None else now), "dwell": 0, "moods": {}})
         rec["dwell"] = int(rec.get("dwell", 0)) + int(n)
         self._dirty = True
 
-    def play(self, edge_id, now=None):
+    def play(self, edge_id: str | None, now: float | None = None) -> None:
         """This clip actually rolled on a panel -- as opposed to merely existing."""
         if not edge_id:
             return
@@ -105,7 +110,7 @@ class Lived:
         rec["last"] = now
         self._dirty = True
 
-    def flush(self, force=False, now=None):
+    def flush(self, force: bool = False, now: float | None = None) -> bool:
         """Persist at most every FLUSH_EVERY seconds. Returns True if it wrote.
 
         Fail-soft by contract: a statistics file is never worth a dark panel."""
@@ -129,42 +134,42 @@ class Lived:
         return True
 
     # ---------------------------------------------------------------- reads
-    def visits(self, node):
+    def visits(self, node: str) -> int:
         return int((self.nodes.get(node) or {}).get("visits", 0))
 
-    def dwell(self, node):
+    def dwell(self, node: str) -> int:
         return int((self.nodes.get(node) or {}).get("dwell", 0))
 
-    def plays(self, edge_id):
+    def plays(self, edge_id: str) -> int:
         return int((self.edges.get(edge_id) or {}).get("plays", 0))
 
-    def visited(self):
+    def visited(self) -> set[str]:
         """Every pose actually stood in. Ground truth for the frontier -- the journal only
         records decision POINTS, so a pose walked THROUGH never appeared there."""
         return {n for n, r in self.nodes.items() if int(r.get("visits", 0)) > 0}
 
-    def unplayed(self, all_edge_ids):
+    def unplayed(self, all_edge_ids: Iterable[str]) -> set[str]:
         """Clips that exist and have never once rolled. Rendered, paid for, never seen."""
         return {e for e in all_edge_ids if self.plays(e) == 0}
 
-    def dominant_mood(self, node):
+    def dominant_mood(self, node: str) -> str | None:
         moods = (self.nodes.get(node) or {}).get("moods") or {}
         return max(moods.items(), key=lambda kv: kv[1])[0] if moods else None
 
-    def age(self, node, now=None):
+    def age(self, node: str, now: float | None = None) -> tuple[float | None, float | None]:
         """(seconds since first stood here, seconds since last) or (None, None)."""
         rec = self.nodes.get(node) or {}
         now = time.time() if now is None else now
         first, last = rec.get("first"), rec.get("last")
         return ((now - first) if first else None, (now - last) if last else None)
 
-    def totals(self):
+    def totals(self) -> dict:
         v = sum(int(r.get("visits", 0)) for r in self.nodes.values())
         return {"poses_lived": len(self.visited()), "visits": v,
                 "clips_played": sum(int(r.get("plays", 0)) for r in self.edges.values())}
 
 
-def _read(path):
+def _read(path: str | Path) -> dict:
     try:
         d = json.loads(Path(path).read_text(encoding="utf-8"))
         return d if isinstance(d, dict) else {}
@@ -172,7 +177,7 @@ def _read(path):
         return {}
 
 
-def load(character, base=None):
+def load(character: str, base: str | Path | None = None) -> Lived:
     """Reader-side snapshot. Readers never write, so a torn read degrades to fewer facts,
     never to a crash."""
     return Lived(character, base=base)

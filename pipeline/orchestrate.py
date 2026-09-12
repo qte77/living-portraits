@@ -50,7 +50,10 @@ import argparse
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 # --- pure-stdlib runtime layer: always available -------------------------------------------
 ROOT = Path(__file__).resolve().parent.parent
@@ -61,7 +64,7 @@ if str(ROOT / "pipeline") not in sys.path:
     # the same way their own self-tests do.
     sys.path.insert(0, str(ROOT / "pipeline"))
 
-from runtime.clip_graph import POSES, Clip, ClipGraph, MANIFEST_PATH  # noqa: E402
+from runtime.clip_graph import POSES, Clip, ClipGraph, MANIFEST_PATH
 
 # Where generation writes / where we read portraits + cutouts + rigs.
 GEN_DIR = ROOT / "data" / "gen"
@@ -98,7 +101,7 @@ def _probe_stages() -> dict:
 
     # segment: numpy+opencv required; SAM backend is itself import-guarded inside segment.
     try:
-        import segment as _seg  # noqa: F401
+        import segment as _seg
 
         try:
             sam_ok = _seg.sam_available()
@@ -110,7 +113,7 @@ def _probe_stages() -> dict:
 
     # rig_spec: numpy+opencv; Haar ships with opencv; dlib landmarks optional.
     try:
-        import rig_spec as _rs  # noqa: F401
+        import rig_spec as _rs
 
         try:
             lm = _rs._landmarks_available()
@@ -122,7 +125,7 @@ def _probe_stages() -> dict:
 
     # verify: numpy+opencv required; insightface + ollama are the soft-degrade axes.
     try:
-        import verify as _vf  # noqa: F401
+        import verify as _vf
 
         ins = False
         try:
@@ -155,20 +158,20 @@ class BuildResult:
     """
 
     slug: str
-    portrait: Optional[str] = None
-    cutout: Optional[str] = None
-    bg: Optional[str] = None
-    rig: Optional[str] = None
-    backend: Optional[str] = None
-    coverage: Optional[float] = None
+    portrait: str | None = None
+    cutout: str | None = None
+    bg: str | None = None
+    rig: str | None = None
+    backend: str | None = None
+    coverage: float | None = None
     verdict: object = None  # verify.Verdict | None (kept loose so this module imports verify-free)
     registered: bool = False
-    clip_key: Optional[str] = None
+    clip_key: str | None = None
     quarantined: bool = False
     reasons: list[str] = field(default_factory=list)
     dry_run: bool = False
     plan: list[str] = field(default_factory=list)
-    error: Optional[str] = None
+    error: str | None = None
 
     def to_dict(self) -> dict:
         v = self.verdict
@@ -217,7 +220,7 @@ def _clean_pass(verdict, strict: bool) -> bool:
     return True
 
 
-def _char_md_path(slug: str) -> Optional[Path]:
+def _char_md_path(slug: str) -> Path | None:
     p = CHARS_DIR / f"{slug}.md"
     return p if p.exists() else None
 
@@ -230,18 +233,18 @@ def _portrait_path(slug: str) -> Path:
 # ==========================================================================================
 # The producer loop for ONE character.
 # ==========================================================================================
-def build_character(
+def build_character(  # noqa: PLR0912, PLR0915  -- the producer loop for one character end to end: portrait -> segment -> rig_spec -> verify -> (maybe) register. One character's whole build sequence belongs in one place a reviewer can read top to bottom.
     slug: str,
     *,
     strict: bool = True,
-    graph: Optional[ClipGraph] = None,
+    graph: ClipGraph | None = None,
     manifest_path: Path | str = MANIFEST_PATH,
-    portrait_path: Optional[Path | str] = None,
-    out_dir: Optional[Path | str] = None,
+    portrait_path: Path | str | None = None,
+    out_dir: Path | str | None = None,
     regenerate: bool = False,
     allow_generate: bool = False,
     save: bool = True,
-    canonical_portrait: Optional[Path | str] = None,
+    canonical_portrait: Path | str | None = None,
     dry_run: bool = False,
 ) -> BuildResult:
     """Run one character from portrait -> segment -> rig_spec -> verify -> (maybe) clip row.
@@ -297,7 +300,7 @@ def build_character(
     # ---- stage 1: portrait (guarded) -------------------------------------------------------
     if will_generate:
         try:
-            import generate as _gen  # noqa: F401
+            import generate as _gen
 
             # generate.main() reads sys.argv; call its building blocks explicitly instead so we
             # never depend on argv state. It has no slug-arg API beyond main(), so we set argv.
@@ -485,7 +488,7 @@ def build_all(
 
 def worklist(
     manifest_path: Path | str = MANIFEST_PATH,
-    required: Optional[Iterable[tuple[str, str]]] = None,
+    required: Iterable[tuple[str, str]] | None = None,
 ) -> list[tuple[str, str]]:
     """What the gen backfill should make next: the graph's missing (synthetic) edges.
 
@@ -500,7 +503,7 @@ def worklist(
 # ==========================================================================================
 # Self-test  --  run the EXISTING phineas portrait through segment+rig+verify; dry-run if none.
 # ==========================================================================================
-def _find_phineas_portrait() -> Optional[Path]:
+def _find_phineas_portrait() -> Path | None:
     """Locate a real phineas portrait to self-test against.
 
     Prefers the canonical pipeline location data/gen/phineas_portrait.png. Falls back to the

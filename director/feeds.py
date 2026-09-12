@@ -137,7 +137,11 @@ def signal_headlines(max_lines=5):
 
         chosen = headlines or fallback
         return chosen[:max_lines]
-    except Exception:
+    except Exception as e:
+        # Fail-open stays -- the module contract is "swallow all failure -> []" so a
+        # dead feed never stalls the director. But an outright fetch failure here used
+        # to look identical to "no signal issue yet", and those are different facts.
+        print("signal_headlines: feed fetch failed -- %r" % (e,), flush=True)
         return []
 
 

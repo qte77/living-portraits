@@ -78,7 +78,7 @@ class GraphCycler:
     idles, occasionally takes a TRANSITION edge to another pose (plays it once, then
     advances to that node). So phineas walks anchor -> stand up -> standing idles ->
     sit down -> anchor, on a randomized non-repeating path."""
-    def __init__(self, graph, character, size, loops, transition_prob=0.2, start_pose="anchor",
+    def __init__(self, graph, character, size, loops, *, transition_prob=0.2, start_pose="anchor",
                  spec=None, hour_override=None, max_idle_secs=0.0, sleep_idle_secs=12.0,
                  mind_on=False, policy_on=False):
         self.size = size
@@ -414,7 +414,7 @@ def _assert_topmost():
         print("topmost failed:", e, flush=True)
 
 
-def main():
+def main():  # noqa: PLR0915  -- the preview script's entry point: argparse, then wiring the two panels/graph/watchdog for one long-running process. Top-to-bottom is how a reviewer already reads a script's main().
     ap = argparse.ArgumentParser()
     ap.add_argument("--a", default="phineas", help="character on panel A")
     ap.add_argument("--b", default="seraphina", help="character on panel B")
@@ -501,7 +501,8 @@ def main():
             # screen is free again. The same process persists (watchdog sees it UP -> no restart churn).
             print("display lost (%r) -> recovering" % ex, flush=True)
             try:
-                ca.cache.clear(); cb.cache.clear()
+                ca.cache.clear()
+                cb.cache.clear()
                 pygame.display.quit()
             except Exception:
                 pass

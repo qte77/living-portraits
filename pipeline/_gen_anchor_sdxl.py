@@ -285,7 +285,7 @@ def render_anchor(spec: dict, slug: str, seed: int, base_model: str,
         face_emb = face_info["embedding"]
         face_kps = _draw_kps(ref_img.resize((params["width"], params["height"])), _scaled_kps(
             face_info["kps"], ref_img.size, (params["width"], params["height"])))
-        image = pipe(
+        return pipe(
             prompt=prompt, negative_prompt=neg,
             image_embeds=face_emb, image=face_kps,
             controlnet_conditioning_scale=controlnet_scale,
@@ -293,7 +293,6 @@ def render_anchor(spec: dict, slug: str, seed: int, base_model: str,
             num_inference_steps=params["steps"], guidance_scale=params["cfg"],
             width=params["width"], height=params["height"],
             generator=generator).images[0]
-        return image
 
     # ---- no-reference path: this gen DEFINES the identity --------------------------------
     # InstantID needs a face to read an embedding from. With no approved reference we cannot
@@ -304,7 +303,7 @@ def render_anchor(spec: dict, slug: str, seed: int, base_model: str,
           " re-run after to lock subsequent gens to this face.", flush=True)
     face_kps = _centered_kps(params["width"], params["height"])
     zero_emb = np.zeros((512,), dtype=np.float32)  # neutral embedding; look comes from the prompt
-    image = pipe(
+    return pipe(
         prompt=prompt, negative_prompt=neg,
         image_embeds=zero_emb, image=face_kps,
         controlnet_conditioning_scale=controlnet_scale * 0.5,  # softer -- no real identity to hold
@@ -312,7 +311,6 @@ def render_anchor(spec: dict, slug: str, seed: int, base_model: str,
         num_inference_steps=params["steps"], guidance_scale=params["cfg"],
         width=params["width"], height=params["height"],
         generator=generator).images[0]
-    return image
 
 
 def _scaled_kps(kps, src_size, dst_size):

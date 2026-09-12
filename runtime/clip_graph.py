@@ -33,7 +33,10 @@ import os
 import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 # The pose vocabulary. MUST stay in lock-step with
 # director/stage_manager.py:ACTIONS -- those are the only `action` values a beat

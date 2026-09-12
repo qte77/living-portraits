@@ -39,9 +39,12 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Iterable, Iterator
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
 
 try:                                     # player.py:35 puts runtime/ on sys.path
     from clip_graph import CLIPS_DIR, Clip
@@ -340,8 +343,13 @@ def clip_frames(clip: Clip, width: int, height: int, theme: dict) -> Iterator[np
             for fr in _iter_asset(clip, width, height):
                 produced = True
                 yield fr
-        except Exception:
+        except Exception as e:
+            # Fail-open stays: a bad/missing asset must not go black. But a decode
+            # that dies partway through used to vanish with no trace, which reads
+            # exactly like "this clip has no asset" -- a different, worse bug.
             produced = False
+            print("clip_frames: asset decode failed for %s -- %r (falling back to synthetic)"
+                  % (clip.to_node, e), flush=True)
         if not produced:
             yield from _iter_synthetic(clip, width, height, clip.to_node, theme)
 
