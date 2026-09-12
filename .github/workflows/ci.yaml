@@ -218,3 +218,42 @@ jobs:
       - name: Formatting drift (advisory)
         continue-on-error: true
         run: uvx ruff@0.16.6 format --diff runtime director scripts health pipeline _preview_graph.py
+
+  security:
+    name: security scan (bandit + pip-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+
+      # Static analysis for security-relevant patterns (injection, unsafe
+      # deserialization, weak crypto, etc). pyproject.toml's
+      # [tool.ruff.lint].ignore already documents several deliberate,
+      # AGENTS.md-backed exemptions bandit doesn't know about -- S101 asserts,
+      # S311 non-crypto random, S603/S607 subprocess, S310 urlopen, PTH105 --
+      # so this step will re-flag some of the same lines on purpose. That is
+      # expected, not a regression, and not something this step tries to
+      # silence. Non-blocking for now: a first pass reports findings for
+      # triage rather than failing CI on day one, the same way the formatting
+      # step above is advisory.
+      - name: Bandit (advisory)
+        continue-on-error: true
+        run: uvx bandit@1.9.4 -r runtime director pipeline scripts health
+
+      # requirements-gen.txt's CUDA/torch stack (pyproject.toml's `gen`
+      # extra) is unpinned on purpose -- its own comment explains why a pin
+      # would be a pin for one machine -- so it has nothing meaningful to
+      # audit and is excluded here. This exports only the core dependencies
+      # plus the `dev` extra that CI actually installs.
+      - name: Export locked dependencies (core + dev, no gen extra)
+        run: uv export --extra dev --no-hashes -o requirements-audit.txt
+
+      # Known-vulnerability check against the exact pins in uv.lock.
+      # Non-blocking for now, same reasoning as the bandit step above.
+      - name: pip-audit (advisory)
+        continue-on-error: true
+        run: uvx pip-audit@2.10.1 -r requirements-audit.txt
