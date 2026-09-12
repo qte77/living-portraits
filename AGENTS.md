@@ -98,19 +98,28 @@ are not interchangeable — check which one your caller actually uses.
 
 ## Verifying a change
 
-1. `python -m pytest tests/ -q` — the count must not go down, and a test that
-   flipped from pass to skip is a regression wearing a disguise.
-2. `python runtime/video_graph.py build` — if you touched the graph, poses, or
-   specs. Zero walk-safety errors.
-3. `python scripts/export_context_view.py` then reload the viewer — if you
-   touched anything the six lenses read.
-4. **Check the thing, not something adjacent to it.** Every green signal here can
+1. `uv run pytest tests/ -q` — the count must not go down, and a test that
+   flipped from pass to skip is a regression wearing a disguise. (This also
+   runs `tests/test_import_boundaries.py`, the mechanical check on the six
+   pure walker modules' imports — see "the five rules," rule 2, above.)
+2. `uv run ruff check runtime director scripts health tests gallery.py
+   player.py pipeline _preview_graph.py` — the full lint gate, all of it; a
+   scope hole here once hid ~90 real findings in `pipeline/` for a long time.
+3. `uv run python runtime/video_graph.py build` — if you touched the graph,
+   poses, or specs. Zero walk-safety errors.
+4. `uv run python scripts/export_context_view.py` then reload the viewer —
+   if you touched anything the six lenses read.
+5. `uvx bandit -r runtime director pipeline scripts health` and `uvx
+   pip-audit` — advisory for now (CI doesn't block on either yet), but worth
+   running yourself if you touched anything that fetches, spawns, or
+   deserializes.
+6. **Check the thing, not something adjacent to it.** Every green signal here can
    be green while the thing is broken: `pytest` exits 0 having collected nothing,
    a static server answers 200 for a page whose JavaScript died before drawing,
    and `capture_demo --selftest` proves the compositor without running the
    walker. Both bugs found in the 2026-09 pass were invisible for the same
    reason — the check was a proxy. Run the walker; open the page.
-5. For anything visual, **probe the DOM, do not eyeball a screenshot.** A CSS bug
+7. For anything visual, **probe the DOM, do not eyeball a screenshot.** A CSS bug
    in this repo's history stacked a label and its percentage at the same x; it
    was found by comparing two elements' bounding boxes and would not have been
    found by looking. Screenshots confirm; they do not falsify — but take one

@@ -40,13 +40,19 @@ Then read the "If you read nothing else" list at the top of
 
 - **The test count does not go down.** A test that flipped from pass to skip is a
   regression wearing a disguise — say so in the PR if you meant to do it.
-- **The graph still builds** (`python runtime/video_graph.py build`, zero
+- **`uv run ruff check` is clean on the full scope** — `runtime director scripts
+  health tests gallery.py player.py pipeline _preview_graph.py`, all of it. A
+  scope hole here once hid ~90 real findings in `pipeline/` for a long time.
+- **The graph still builds** (`uv run python runtime/video_graph.py build`, zero
   walk-safety errors) if you touched poses, specs, or the graph itself.
 - **Visual changes are probed, not eyeballed.** Compare bounding boxes, assert on
   the DOM. A screenshot can confirm a fix; it cannot falsify one.
 - **New behaviour arrives with a test**, and where the behaviour is about
   production reality rather than logic, it belongs in the `test_real_*` family
   that measures against the snapshot instead of a fixture you built to pass.
+- **`uvx bandit` / `uvx pip-audit`** if you touched anything that fetches,
+  spawns a process, or deserializes — advisory in CI for now, but worth running
+  yourself before the PR lands.
 
 ## How changes land
 
