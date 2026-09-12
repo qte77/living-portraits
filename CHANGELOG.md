@@ -11,6 +11,83 @@ tagged unless it appears here.
 
 ## Unreleased
 
+**uv is now the sole toolchain, and the codebase got a hardening pass on top of it.** Neither
+was one commit — `uv` migration, then a scope hole in the lint gate, then two rounds of a CI job
+that looked broken but wasn't (and one round where it was), then the actual fixes that scope hole
+had been hiding. Four PRs (#1, #5, #6, #7 on this fork), grounded and verified at each step rather
+than assumed.
+
+### Added
+- **`pyproject.toml` replaces `requirements.txt`/`requirements.lock`/`ruff.toml`.** One file:
+  hatchling packaging (`director/pipeline/health/scripts` are now real packages), the dependency
+  floors that used to live in `requirements.txt`, and `ruff.toml`'s entire `[lint]` table folded
+  in verbatim — every existing ignore's reason preserved word for word. `uv sync` is now the
+  documented install everywhere (README, AGENTS.md, CONTRIBUTING.md); CI does the same.
+- **`opencv-python` → `opencv-python-headless`.** Nothing in this tree calls a cv2 GUI function
+  (checked repo-wide — zero hits outside `pipeline/vendor`). The GUI build's bundled Qt/GTK libs
+  made a cold `import cv2` measure ~7.5s in testing; headless does the same job in ~0.1s. A 75x
+  win on every entry point that touches cv2 — tests, `capture_demo.py`, the player, pipeline
+  scripts — for free.
+- **`tests/test_import_boundaries.py`** — an `ast`-based check that the six pure walker modules
+  (`circadian, lived, mind, policy, edge_style, pathfind`) never import numpy/cv2/pygame/
+  director/pipeline. Mechanizes the exact invariant PR #28's history shows was once caught only
+  because a reviewer happened to notice a boundary crossing. No new dependency — import-linter
+  was considered and dropped as more tooling than one rule needed.
+- **A `security` CI job** — `bandit` + `pip-audit` against the core/dev dependency groups,
+  advisory (`continue-on-error`) for now while findings get triaged. Two sites neither tool can
+  see are flagged in PR #47's description instead of fixed: `health/checks.py`'s SSH-shipped
+  `exec()` (the call is inside a string literal, invisible to AST-based scanners) and
+  `director/feeds.py`'s unbounded `resp.read()` on external content.
+- **Grouped Dependabot updates** (`.github/dependabot.yml`) for the `uv` and `github-actions`
+  ecosystems — the latter matters more than it sounds: GitHub Actions here are now pinned to
+  full commit SHAs (a repo ruleset requirement), which means they never move on their own without
+  something like this doing it for them.
+- **The ruff CI gate now actually covers `pipeline/` and `_preview_graph.py`** — the real
+  production player, per AGENTS.md — which had never been linted at all. Closing that hole
+  surfaced ~90 real findings under the ruleset that was already there; all fixed. The ruleset
+  itself widened too: `TC` and `BLE` are now selected, and `ANN` is enforced on the six pure
+  walker modules as this pass's answer to "start the typing work without standing up a second
+  tool" — every other path is exempted with a `FOLLOW-UP` tag for later, directory by directory.
+
+### Fixed
+- **Issue #9's remaining four silent swallows** — `runtime/clip_player.py`, `director/feeds.py`,
+  `director/heartbeat.py`, `runtime/behavior_select.py` — now log `repr(e)` instead of eating the
+  exception, the same pattern PR #38 already established for the first four. Each has a test
+  asserting the exception is now visible, not gone.
+- **`scripts/unstick.py` raced `lp-gen`'s own scheduled writes.** It read
+  `data/mind/autogen_poses.json` once, then spent real minutes on two Higgsfield generations per
+  link before writing the whole in-memory snapshot back — with no lock — while `pipeline/autogen.py`
+  writes the same file under `autogen.lock` every ~20 minutes. A concurrent write in that window
+  would have been silently overwritten. Fixed: the write-back now acquires the same lock and
+  re-reads fresh immediately before writing, so it only ever touches its own one link.
+- **`pipeline/autogen.py`'s `_record_pose()` would have silently dropped a link `unstick.py`
+  recorded**, if the same pose were ever re-recorded — it rebuilt the whole record from scratch
+  instead of merging `extra_links`. Fixed to merge by sibling. New test:
+  `test_record_pose_merges_extra_links_on_re_record`.
+- **Issue #44's four one-line bugs**: `tests/run_all.py`'s pytest shim didn't accept `**kwargs`
+  (so `pytest.skip(..., allow_module_level=True)` raised `TypeError` instead of skipping cleanly
+  without cv2); `AGENTS.md` claimed `scripts/live_view.py` "adds no writer," which stopped being
+  true the moment it started publishing `pose/<char>.json`; a dead `stage.render_canvas(...)` call
+  left over from an old F841 fix in `capture_demo.py`. (Its fourth item — a mislabeled e2e timeout
+  comment — has no code left to fix: the teardown step it described was never actually merged.)
+- **Two doc corrections from the same audit**: Seraphina's ROADMAP entry said "one node, no
+  panel," which undersold the bedtime routine's own additional poses; ARCHITECTURE.md attributed
+  "why two panels don't race" to the per-character pose-file split, when the real reason is that
+  `_preview_graph.py` drives both `GraphCycler`s from one single-threaded loop — nothing runs
+  concurrently there in the first place.
+- **The e2e workflow's own uv cache, twice.** First pass removed `enable-cache: true` and assumed
+  that disabled caching — it didn't. `setup-uv` auto-enables caching whenever it finds a
+  `uv.lock`, which this repo has had since the migration above, regardless of the `with:` block
+  being absent. The post-run cache-prune step kept hanging ~5 minutes then failing with exit code
+  2, on runs where the actual e2e test (0 findings) had already succeeded — a passing run turning
+  red for a reason with nothing to do with the page it tests. Fixed properly the second time:
+  `enable-cache: false`, explicit.
+- **Three PowerShell catch blocks named their own reason.** `start_portraits.ps1`,
+  `stop_portraits.ps1`, `install/sera_build.ps1` each had a bare `catch {}` around a best-effort
+  step (a window title, stopping a local model) — correct fail-open shape, just never stated why,
+  the way the Python side's `SIM105`/`BLE001` ignores are. `Write-Verbose "<reason>"` changes
+  nothing observable and makes the guard legible.
+
 **The context graph is now something you can look at.** Every layer 0.3.x and 0.4.0 added lives
 in a file the viewer never opened, so the only picture of this system was still the May one: a
 pose graph and a clip list.
