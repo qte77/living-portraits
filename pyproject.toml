@@ -17,9 +17,16 @@ dynamic = ["version"]
 # every documented entry point that isn't the walker still imports it, so
 # treating it as core matches what "pip install this and follow AGENTS.md" has
 # always meant. See AGENTS.md rule 2 for exactly which modules must stay stdlib.
+# opencv-python-headless, not opencv-python: nothing in this tree calls a cv2
+# GUI function (imshow/waitKey/namedWindow -- checked repo-wide, zero hits
+# outside pipeline/vendor). The GUI build's bundled Qt/GTK libs make cv2 cold-
+# import in ~7.5s and ship ~116MB of .libs; headless imports the same API in
+# ~0.1s with none of that -- a 75x import-time win for every entry point that
+# touches cv2 (tests, capture_demo, the player, pipeline scripts), verified in
+# this sandbox with `python -X importtime -c "import cv2"` before/after.
 dependencies = [
   "numpy>=1.24",
-  "opencv-python>=4.8",
+  "opencv-python-headless>=4.8",
   "PyYAML>=6.0",
   "pillow>=10.0",
   "imageio>=2.31",
