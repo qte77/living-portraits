@@ -101,7 +101,7 @@ CANVAS_H = 256
 # cv2 are present in the real pipeline and on this dev box). A hard failure here
 # is a real bug -- unlike pygame, these are the modules the demo exists to drive.
 # These three come AFTER the sys.path insert above -- that is the wiring, not an
-# oversight (see ruff.toml's note on E402).
+# oversight (see pyproject.toml's [tool.ruff.lint] note on E402).
 import stage_render as sr
 import crossframe as xf
 from rig_loop import RigLoop

@@ -52,7 +52,7 @@ Then:
     python runtime/video_graph.py build
     python scripts/export_context_view.py
 
-Requires Pillow (in requirements.txt). ASCII only, no network.
+Requires Pillow (a pyproject.toml dependency). ASCII only, no network.
 """
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ for _p in (ROOT, ROOT / "runtime"):
 try:
     from PIL import Image, ImageDraw
 except ImportError:                                             # pragma: no cover
-    sys.exit("Pillow is required: python -m pip install -r requirements.txt")
+    sys.exit("Pillow is required: uv sync")
 
 GEN = ROOT / "data" / "gen"
 PROTO = ROOT / "data" / "clips" / "_proto"

@@ -18,7 +18,7 @@
 # measured at 16 findings before the fix and 0 after.
 #
 # Playwright is pulled in per-run with `uvx --with`, never added to
-# requirements.txt, so the walker's near-stdlib dependency contract is untouched
+# pyproject.toml, so the walker's near-stdlib dependency contract is untouched
 # by a browser-testing tool.
 
 name: e2e
@@ -50,9 +50,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install project dependencies
-        run: |
-          uv venv
-          uv pip install -r requirements.txt
+        run: uv sync
 
       # The viewer reads one exported JSON, and data/ is gitignored, so the
       # artifact has to be built before there is anything to look at. This is

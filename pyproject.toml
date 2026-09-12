@@ -1,4 +1,64 @@
-# ruff.toml -- the single Python linter for this project.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "living-portraits"
+description = "Two LED panels showing characters who are awake -- deterministic player, slow generation loop, a context graph between them."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dynamic = ["version"]
+
+# Floors, not pins, matching the comment this replaces in requirements.txt: the
+# suite is green on the current release of each as of 2026-09-02. pygame is here
+# (not split into an extra) because it is the one core dep the render loop itself
+# does not need -- runtime/ down to the walker is pure stdlib by contract -- but
+# every documented entry point that isn't the walker still imports it, so
+# treating it as core matches what "pip install this and follow AGENTS.md" has
+# always meant. See AGENTS.md rule 2 for exactly which modules must stay stdlib.
+dependencies = [
+  "numpy>=1.24",
+  "opencv-python>=4.8",
+  "PyYAML>=6.0",
+  "pillow>=10.0",
+  "imageio>=2.31",
+  "pygame>=2.5",
+]
+
+[project.optional-dependencies]
+# Everything the four-command onboarding chain and the test suite need beyond
+# core. Not "test" -- ruff is a lint tool, not a test dep -- but there is only
+# one contributor-facing loop here (AGENTS.md / CONTRIBUTING.md), so one group.
+dev = [
+  "pytest>=8.0",
+  "ruff==0.16.6",   # pinned to match .claude/bench.py's uvx invocation
+]
+
+# The clip-generation stack. Unpinned on purpose -- requirements-gen.txt's own
+# comment explains why: the working set is CUDA- and driver-specific, so a pin
+# here would be a pin for one machine. install/GENSTACK_INSTALL.md carries the
+# versions verified on the production host. Nothing under runtime/, director/,
+# health/, scripts/ or tests/ imports any of this -- see CONTRIBUTING.md.
+gen = [
+  "torch",
+  "diffusers",
+  "transformers",
+  "accelerate",
+  "insightface",
+  "onnxruntime-gpu",
+  "imageio-ffmpeg",
+]
+
+[tool.hatch.version]
+path = "VERSION"
+pattern = "(?P<version>.+)"
+
+[tool.hatch.build.targets.wheel]
+packages = ["runtime", "director", "pipeline", "health", "scripts"]
+
+# ---------------------------------------------------------------------------
+# ruff -- the single Python linter for this project.
 #
 # One tool, not several. Ruff replaced pylint here in 2026-09: it finds the same
 # real defects, does no type inference (so cv2's C-extension namespace produces
@@ -11,17 +71,20 @@
 # badge measures. That is fine: the point of this file is that findings get
 # fixed rather than silenced, not that a letter improves.
 #
-# The rule for editing this file: an entry in `ignore` needs a one-line reason
-# pointing at a specific decision in AGENTS.md or ARCHITECTURE.md. If you cannot
-# write that reason, fix the code instead.
-
+# The rule for editing this section: an entry in `ignore` needs a one-line
+# reason pointing at a specific decision in AGENTS.md or ARCHITECTURE.md. If
+# you cannot write that reason, fix the code instead.
+#
+# Formerly its own ruff.toml; folded in here once pyproject.toml existed, so
+# there is one config file instead of two. Ruff auto-discovers this table.
+[tool.ruff]
 line-length = 120        # p50=41, p90=88, p99=103. 120 flags the genuine outliers.
 target-version = "py310" # README claims 3.10+; this is what holds us to it.
 
 # Never lint what we do not own or run.
 extend-exclude = ["pipeline/vendor", "data", "_shots", ".venv", ".venv-gen"]
 
-[lint]
+[tool.ruff.lint]
 select = [
     "F",      # pyflakes -- unused imports/names, real errors
     "E4", "E7", "E9",  # pycodestyle: imports, statements, syntax (E1/E2/E3 are formatter's job)
@@ -167,11 +230,11 @@ ignore = [
 # 8 is where the genuine outliers start, and the two that exceed it -- weigh()
 # at 18 and choose() at 19 -- carry their reason at their own def line rather
 # than hiding behind this number.
-[lint.pylint]
+[tool.ruff.lint.pylint]
 max-args = 8
 max-positional-args = 8
 
-[lint.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 # Tests reach into internals on purpose (verify._synthetic_face, rig._synth_cutout)
 # and rebind fixture names by pytest's own convention.
 "tests/*" = [
@@ -198,4 +261,3 @@ max-positional-args = 8
 # rewrapping them would change what gets sent. 57 of the repo's 69 long lines
 # are these.
 "runtime/video_graph.py" = ["E501"]
-
