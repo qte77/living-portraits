@@ -630,13 +630,20 @@ def _generate_extra_links(client, g, char, label, new_url, extra_links, log):
 def _record_pose(p, hub, fwd, rev, extra_links=None):
     char, label = p["character"], p["label"]
     ag = _load(AUTOGEN, {"characters": {}})
+    # A full-dict replacement here would silently wipe extra_links something else
+    # (scripts/unstick.py) already recorded for this label, if this pose is ever
+    # re-recorded after that -- merge by sibling instead of overwriting (issue #44).
+    prior = (ag.get("characters", {}).get(char, {}).get("poses", {}).get(label, {})
+               .get("extra_links") or [])
+    merged = {el["sibling"]: el for el in prior if el.get("sibling")}
+    merged.update({el["sibling"]: el for el in (extra_links or []) if el.get("sibling")})
     ag.setdefault("characters", {}).setdefault(char, {}).setdefault("poses", {})[label] = {
         "node_image": "data/gen/%s_%s.png" % (char, label),
         "still_prompt": p["still_prompt"],
         "hub": hub,
         "transition": {"label": fwd, "reverse_label": rev, "motion": p.get("transition_motion", "")},
         "idles": [{"id": i["id"], "motion": i.get("motion", "")} for i in p.get("idles", [])],
-        "extra_links": extra_links or [],
+        "extra_links": list(merged.values()),
     }
     _save(AUTOGEN, ag)
 

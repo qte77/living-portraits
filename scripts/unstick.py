@@ -135,10 +135,18 @@ def main():  # noqa: PLR0912,PLR0915  -- CLI entry: parse, rank the plan, print 
         return 0
 
     from pipeline import autogen as ag
+    # Read-once here is only for the PLAN-TIME duplicate-link skip below and for the
+    # node/pose lookups that follow -- it is deliberately never written back. Each
+    # link's actual record (further down) re-reads fresh, under the lock, right before
+    # writing: this loop calls hf_gen.generate_clip() twice per link, which is a real
+    # multi-minute wait, and lp-gen's own scheduled worker (pipeline/autogen.py, every
+    # ~20 min) writes this same file. A stale snapshot held across that wait and then
+    # written back whole would silently clobber whatever lp-gen wrote in between
+    # (issue #44) -- so nothing here mutates `store`.
     store = _load(args.autogen, {})
     for ch, r, sib in plan:
         rec = store["characters"][ch]["poses"][r["pose"]]
-        links = rec.setdefault("extra_links", [])
+        links = rec.get("extra_links", [])
         if any(el.get("sibling") == sib for el in links):
             print("  %s:%s already links to %s -- skipping" % (ch, r["pose"], sib))
             continue
@@ -184,10 +192,30 @@ def main():  # noqa: PLR0912,PLR0915  -- CLI entry: parse, rank the plan, print 
         # BOTH directions or neither: _autogen_additions drops a half-link anyway, and a
         # recorded link whose clips are missing is a lie in the record.
         if len(made) == 2:
-            links.append({"sibling": sib, "label": lfwd, "reverse_label": lrev,
-                          "motion": pairs[0][3]})
-            Path(args.autogen).write_text(json.dumps(store, indent=2), encoding="utf-8")
-            print("  recorded link %s <-> %s" % (sib, r["pose"]))
+            # Same lock pipeline/autogen.py's own writes use (_acquire_lock/_release_lock),
+            # held only around this read-modify-write -- not across the generation calls
+            # above, which would block lp-gen for the minutes those take. Re-read fresh
+            # under the lock rather than writing back the plan-time `store`, so a
+            # concurrent lp-gen write in the meantime is preserved, not overwritten.
+            if not ag._acquire_lock():
+                print("  autogen.lock held by another process -- clips generated but NOT "
+                      "recorded for %s <-> %s; re-run --apply to record it" % (sib, r["pose"]))
+                continue
+            try:
+                fresh = _load(args.autogen, {})
+                fpose = (fresh.setdefault("characters", {}).setdefault(ch, {})
+                              .setdefault("poses", {}).setdefault(r["pose"], dict(rec)))
+                flinks = fpose.setdefault("extra_links", [])
+                if any(el.get("sibling") == sib for el in flinks):
+                    print("  %s:%s already links to %s (recorded elsewhere meanwhile) "
+                          "-- skipping" % (ch, r["pose"], sib))
+                else:
+                    flinks.append({"sibling": sib, "label": lfwd, "reverse_label": lrev,
+                                   "motion": pairs[0][3]})
+                    Path(args.autogen).write_text(json.dumps(fresh, indent=2), encoding="utf-8")
+                    print("  recorded link %s <-> %s" % (sib, r["pose"]))
+            finally:
+                ag._release_lock()
         else:
             print("  only %d/2 clips landed for %s <-> %s -- record untouched" % (len(made), sib, r["pose"]))
 
