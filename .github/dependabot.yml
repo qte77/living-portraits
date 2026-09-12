@@ -1,0 +1,38 @@
+# dependabot.yml -- keep the two things this repo depends on current: the
+# Python stack (pyproject.toml + uv.lock) and the GitHub Actions pinned to
+# full commit SHAs in .github/workflows/ (see ci.yaml/e2e.yaml -- a repo
+# setting here requires SHA pins, which means they never move on their own;
+# Dependabot is what moves them instead of them going stale silently).
+#
+# Both ecosystems are grouped into one PR per run rather than one-per-package
+# -- the stack is small (six core libs, two dev tools, two pinned actions),
+# so a flood of single-dependency PRs would be noise, not signal.
+#
+# requirements-gen.txt / pyproject.toml's `gen` extra (the CUDA stack) is
+# deliberately unpinned -- see requirements-gen.txt's and pyproject.toml's own
+# comments -- so there is nothing there for Dependabot to bump.
+
+version: 2
+
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      python-stack:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "build"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
