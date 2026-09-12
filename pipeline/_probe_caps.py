@@ -1,5 +1,8 @@
 """throwaway capability probe for the img2vid prototype build (run on hil)."""
-import sys, os, glob, importlib, pathlib
+import sys
+import os
+import importlib
+import pathlib
 
 print("PY", sys.version.split()[0])
 
@@ -39,11 +42,11 @@ except Exception as e:
     print("ffmpeg MISSING", repr(e))
 
 # where did the portraits get generated?
-for f in glob.glob(r"C:\living-portraits\**\generate*.py", recursive=True):
+for f in pathlib.Path(r"C:\living-portraits").rglob("generate*.py"):
     print("found_generate", f)
 
 # what SD/video models are already cached?
-home = os.environ.get("HF_HOME") or os.path.expanduser(r"~\.cache\huggingface")
+home = os.environ.get("HF_HOME") or pathlib.Path(r"~\.cache\huggingface").expanduser()
 hub = pathlib.Path(home) / "hub"
 print("HF_hub", hub, "exists", hub.exists())
 if hub.exists():

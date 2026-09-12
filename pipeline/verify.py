@@ -46,7 +46,6 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Union
 
 import cv2
 import numpy as np
@@ -68,7 +67,7 @@ OLLAMA_TIMEOUT = 20                # seconds; this is a slow offline gate, but n
 _SSIM_C1 = (0.01) ** 2
 _SSIM_C2 = (0.03) ** 2
 
-ImageLike = Union[np.ndarray, str, Path]
+ImageLike = np.ndarray | str | Path
 
 
 # ======================================================================================
@@ -209,7 +208,7 @@ def _insightface_app():
     return _INSIGHTFACE_APP
 
 
-def _largest_face_embedding(app, img_bgr: np.ndarray) -> Optional[np.ndarray]:
+def _largest_face_embedding(app, img_bgr: np.ndarray) -> np.ndarray | None:
     faces = app.get(img_bgr)
     if not faces:
         return None
@@ -319,7 +318,7 @@ def _theme_voice_of(character_md: ImageLike) -> str:
     return txt.strip()
 
 
-def _ollama_yes_no(model: str, system: str, user_content) -> tuple[Optional[bool], str]:
+def _ollama_yes_no(model: str, system: str, user_content) -> tuple[bool | None, str]:  # noqa: PLR0912  -- the fail-open network+parse cascade: HTTP failure modes, JSON-shape fallback, then a last-resort text scan. Each branch is one degrade-gracefully step in the same contract this file's other gates use; splitting it would scatter one control-flow decision across several small functions.
     """POST a yes/no question to Ollama; return (verdict|None, raw). None == could not decide.
 
     user_content is either a string (text register) or a {'text','images':[b64]} dict (image
@@ -450,7 +449,7 @@ class Verdict:
     degraded: list[str] = field(default_factory=list)     # ran in reduced mode (e.g. no InsightFace)
     skipped: list[str] = field(default_factory=list)      # could not run (e.g. Ollama down)
 
-    def add(self, name: str, result: tuple[bool, float, str]) -> "Verdict":
+    def add(self, name: str, result: tuple[bool, float, str]) -> Verdict:
         ok, score, reason = result
         self.checks.append(name)
         self.scores[name] = score
@@ -475,8 +474,8 @@ class Verdict:
 
 
 def verify_clip(clip_frames, target_node_frame=None, canonical_portrait=None,
-                kind: str = "bridge", aside: Optional[str] = None,
-                character_md: Optional[ImageLike] = None) -> Verdict:
+                kind: str = "bridge", aside: str | None = None,
+                character_md: ImageLike | None = None) -> Verdict:
     """Gate a baked clip before it becomes an edge/node in the clip graph.
 
     clip_frames      : sequence of frames (np arrays or paths); first/last are used.
@@ -517,8 +516,8 @@ def verify_clip(clip_frames, target_node_frame=None, canonical_portrait=None,
     return v
 
 
-def verify_portrait(portrait_img: ImageLike, canonical_portrait: Optional[ImageLike] = None,
-                    character_md: Optional[ImageLike] = None) -> Verdict:
+def verify_portrait(portrait_img: ImageLike, canonical_portrait: ImageLike | None = None,
+                    character_md: ImageLike | None = None) -> Verdict:
     """Gate a freshly generated still portrait before it becomes the canonical node art.
 
     portrait_img      : the new render (path or array).
@@ -568,7 +567,7 @@ def _synthetic_face(size: int = 256, *, cx=None, cy=None, scale=1.0,
     return img
 
 
-def _selftest() -> int:
+def _selftest() -> int:  # noqa: PLR0915  -- a linear walk through every gate in this file (loopability, continuity, identity, register) with its own prints and asserts. Same rationale as tests/*'s PLR0915 exemption: one long scenario is one test, not five.
     print("=" * 78)
     print("verify.py self-test  (synthetic images; no files; network-guarded)")
     print("=" * 78)
@@ -579,7 +578,8 @@ def _selftest() -> int:
     # a DIFFERENT pose: face shifted up-left and scaled up (same scene, wrong node)
     face_pose = _synthetic_face(cx=104, cy=96, scale=1.25)
     # a truncated/corrupt render: bottom half black (what a half-written file looks like)
-    face_trunc = face.copy(); face_trunc[face.shape[0] // 2:, :, :] = 0
+    face_trunc = face.copy()
+    face_trunc[face.shape[0] // 2:, :, :] = 0
     noise = (np.random.default_rng(7).integers(0, 256, face.shape)).astype(np.uint8)
 
     # --- raw SSIM sanity (structure, not color: a recolored-but-aligned face stays ~1) ---
@@ -592,8 +592,8 @@ def _selftest() -> int:
 
     # --- loopability: identical first/last PASSES; a moved last frame FAILS the seam ---
     print("\n-- loopability --")
-    p1, s1, r1 = loopability(face, face_same)
-    p2, s2, r2 = loopability(face, face_pose)
+    p1, _s1, r1 = loopability(face, face_same)
+    p2, _s2, r2 = loopability(face, face_pose)
     print(f"  identical   -> passed={p1}  {r1}")
     print(f"  moved seam  -> passed={p2}  {r2}")
     assert p1 is True, "identical frames must pass loopability"
@@ -601,8 +601,8 @@ def _selftest() -> int:
 
     # --- continuity: lands on target vs drifts to a different pose ---
     print("\n-- continuity --")
-    p3, s3, r3 = continuity(face, face_same)
-    p4, s4, r4 = continuity(face_pose, face)   # clip ends on the wrong (shifted) pose
+    p3, _s3, r3 = continuity(face, face_same)
+    p4, _s4, r4 = continuity(face_pose, face)   # clip ends on the wrong (shifted) pose
     print(f"  lands       -> passed={p3}  {r3}")
     print(f"  drifts      -> passed={p4}  {r4}")
     assert p3 is True, "matching end/target must pass continuity"
@@ -610,8 +610,8 @@ def _selftest() -> int:
 
     # --- identity (degraded here unless InsightFace installed) ---
     print("\n-- identity --")
-    p5, s5, r5 = identity(face, face_same)
-    p6, s6, r6 = identity(face, noise)         # an utterly different image must fail even degraded
+    p5, _s5, r5 = identity(face, face_same)
+    p6, _s6, r6 = identity(face, noise)         # an utterly different image must fail even degraded
     print(f"  same        -> passed={p5}  {r5}")
     print(f"  different    -> passed={p6}  {r6}")
     assert p5 is True, "same image must pass identity (even degraded)"
@@ -623,8 +623,8 @@ def _selftest() -> int:
                 "A washed-up tragedian who knows he is a painting and plays to the house.")
     in_voice = "You there, behind the glass -- yes, you. Witness Act Five, performed for the ten-thousandth time."
     out_voice = "Hi, here's the weather forecast for Tuesday: sunny with a high of 71 degrees."
-    pa, sa, ra = register(in_voice, contract)
-    pb, sb, rb = register(out_voice, contract)
+    pa, _sa, ra = register(in_voice, contract)
+    pb, _sb, rb = register(out_voice, contract)
     print(f"  in-voice    -> passed={pa}  {ra}")
     print(f"  out-voice   -> passed={pb}  {rb}")
 

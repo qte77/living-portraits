@@ -83,7 +83,7 @@ def main():
     pipe.enable_model_cpu_offload()
 
     if torch.cuda.is_available():
-        f, t = torch.cuda.mem_get_info()
+        f, _t = torch.cuda.mem_get_info()
         print("vram_free_GB %.2f" % (f / 1e9), flush=True)
     for seed in args.seeds:
         t0 = time.time()

@@ -99,6 +99,11 @@ select = [
     "C4",     # comprehension rewrites
     "RET",    # return-statement simplifications
     "PTH",    # os.path -> pathlib
+    "TC",     # typing-only imports that belong behind `if TYPE_CHECKING:`
+    "BLE",    # blind except -- flake8-blind-except; catch Exception, not bare except
+    "ANN",    # missing type annotations. Enforced ONLY on the 6 pure walker modules for
+              # now (see per-file-ignores below) -- this IS the typing work for this pass,
+              # ratcheted directory-by-directory instead of standing up mypy/pyright.
     # C90 (mccabe) is deliberately NOT selected: it measures the same functions
     # PLR0912 already flags, so every dense function would need two noqas saying
     # the same thing. One complexity signal, not two.
@@ -121,6 +126,18 @@ ignore = [
     # Genuinely silent swallows are tracked as code review (issue #9), where a
     # human can tell a principled guard from a hidden bug. A linter cannot.
     "SIM105",   # suppressible-exception
+    #
+    # Same contract, same reason -- BLE001 objects to the BREADTH of `except
+    # Exception`, not to what happens after it. Narrowing every one of the 237
+    # catches this flags to a specific exception type would mean enumerating
+    # every failure mode a codec, a socket, or a subprocess can raise, which is
+    # exactly what "fail open at the boundary" means declining to do. Issue #9's
+    # four sites (clip_player.py, feeds.py, heartbeat.py, behavior_select.py)
+    # went through code review and now log their `repr(e)` instead of staying
+    # silent -- they still catch Exception on purpose, so this entry covers them
+    # too. A linter cannot tell a principled boundary catch from a hidden bug;
+    # a human can, which is what issue #9's review already did.
+    "BLE001",   # blind-except
     #
     # --- House style, decided --------------------------------------------------
     #
@@ -250,6 +267,37 @@ max-positional-args = 8
                 # mismatch" -- a different test. Fix per-site, not by sweep.
     "RUF012",   # mutable class attribute default, in a stub used as a fixture
     "PLW1641",  # a comparison helper with __eq__ and no __hash__; never hashed
+    "ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN205", "ANN206",
+    "ANN401",   # FOLLOW-UP: see the ANN block below -- tests are lower priority than
+                # the six pure walker modules, not exempt forever.
+]
+
+# --- FOLLOW-UP: ANN staged directory-by-directory, not repo-wide -----------------------
+#
+# [tool.ruff.lint].select's ANN comment explains why: ~2420 hits repo-wide today, and
+# standing up mypy/pyright is more tooling than this pass wants. So ANN is enforced ONLY
+# on the six pure walker modules for now (circadian.py, lived.py, mind.py, policy.py,
+# edge_style.py, pathfind.py) -- the ones AGENTS.md rule 2 already holds to a stricter
+# bar (stdlib-only, import-safe, unit-testable in isolation) -- and every other path below
+# gets a blanket exemption for the same nine codes until it is annotated on purpose.
+#
+# NOT a decision that these files should stay unannotated. Delete an entry below the
+# moment its directory gets real annotations; ask the tool which codes still fire:
+#
+#     ruff check --select ANN <path> --statistics
+#
+"director/*.py" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN205", "ANN206", "ANN401"]
+"health/*.py" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN205", "ANN206", "ANN401"]
+"pipeline/*.py" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN205", "ANN206", "ANN401"]
+"scripts/*.py" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN205", "ANN206", "ANN401"]
+"gallery.py" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN205", "ANN206", "ANN401"]
+"player.py" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN205", "ANN206", "ANN401"]
+"_preview_graph.py" = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN205", "ANN206", "ANN401"]
+# Every runtime/ file EXCEPT the six pure walker modules above (which get full ANN
+# enforcement -- see the header comment). Listed explicitly rather than "runtime/*.py"
+# so adding this block can never accidentally exempt one of the six by a glob mistake.
+"runtime/{__init__,behavior_select,capture_demo,clip_graph,clip_player,crossframe,graph_provenance,journal_score,panels,rig,rig_loop,stage_render,video_graph}.py" = [
+    "ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN205", "ANN206", "ANN401",
 ]
 # Generation scripts are reference material that runs on a CUDA box, not on the
 # wall. ARCHITECTURE.md:399-401 marks them "LOCAL-GPU EXPERIMENTS (reference, not

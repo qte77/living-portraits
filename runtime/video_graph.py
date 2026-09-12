@@ -15,7 +15,8 @@ generation PROMPTS carried as semantic metadata so the whole thing is agent-quer
 
 Phineas now has TWO poses (anchor seated + standing) joined by stand-up/sit-down
 transitions; the player random-walks the graph (idle a while, transition, idle a while,
-transition back). Seraphina is still single-pose (anchor) until she gets her own standing set.
+transition back). Seraphina still has no second DAYTIME pose (anchor only; the other three
+nodes are her bedtime chain) until she gets her own standing set.
 
 Variants are DISCOVERED by globbing data/clips/_proto/<char>_<label>_v*.gif, so derived
 clips (the reversed sit-down, which has no MJ job) are first-class. Stored at
@@ -339,7 +340,7 @@ EDGE_SPECS = [
     ("phineas", "idle", "bc_survey",     "behind_chair", "behind_chair", "turns his head and shoulders slowly to survey the gallery to one side then the other with cool contempt, then faces forward again", True, ""),
     ("phineas", "idle", "bc_gesture",    "behind_chair", "behind_chair", "sweeps one hand outward in a slow theatrical flourish then brings it back, the other resting near the chair, settling to stillness", True, ""),
     ("phineas", "idle", "bc_settle",     "behind_chair", "behind_chair", "draws himself up to his full grand height beside the chair with a slow breath and a faint regal sway, otherwise standing still facing forward", True, ""),
-    # --- seraphina: anchor idles (single-pose for now) ---
+    # --- seraphina: anchor idles (no second daytime pose yet) ---
     ("seraphina", "idle", "breathe",     "anchor", "anchor", _BREATHE, True, "c4addf08-ccd1-4679-a8f3-ccfd39771561"),
     ("seraphina", "idle", "look_around", "anchor", "anchor", _LOOK,    True, "949a2ab9-e96e-4fa7-be74-7179e90794ac"),
     ("seraphina", "idle", "default",     "anchor", "anchor", _DEFAULT, True, "3c84a919-d7b7-446d-9811-dcabbe29e9ca"),

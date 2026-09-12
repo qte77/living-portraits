@@ -31,7 +31,6 @@ from __future__ import annotations
 import base64
 import json
 import os
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -108,10 +107,10 @@ def _run_create(model, args, exts, files, *, timeout_s=_TIMEOUT_S):
             out = json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
-            raise HFGenError("proxy rejected our token (%s)" % e.code, kind="auth")
-        raise HFGenError("proxy HTTP %s" % e.code, kind="transient")
+            raise HFGenError("proxy rejected our token (%s)" % e.code, kind="auth") from e
+        raise HFGenError("proxy HTTP %s" % e.code, kind="transient") from e
     except Exception as e:
-        raise HFGenError("proxy unreachable: %s" % e, kind="transient")
+        raise HFGenError("proxy unreachable: %s" % e, kind="transient") from e
     if not out.get("ok"):
         err = str(out.get("error", ""))
         low = err.lower()

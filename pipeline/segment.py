@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Optional
 
 import cv2
 import numpy as np
@@ -99,7 +98,7 @@ def _load_sam():
     _SAM_STATE["tried"] = True
     try:
         _sam3_repo_on_path()
-        import torch  # noqa: F401 -- presence check + handed to _sam_segment
+        import torch
         from sam3.model_builder import build_sam3_image_model, download_ckpt_from_hf
         from sam3.model.sam3_image_processor import Sam3Processor
 
@@ -136,16 +135,13 @@ def _squeeze_mask_union(masks, h: int, w: int) -> np.ndarray:
                 break
         if not squeezed:
             break
-    if arr.ndim == 2:
-        out = (arr > 0.5).astype(np.uint8) * 255
-    else:
-        out = np.any(arr > 0.5, axis=0).astype(np.uint8) * 255
+    out = (arr > 0.5).astype(np.uint8) * 255 if arr.ndim == 2 else np.any(arr > 0.5, axis=0).astype(np.uint8) * 255
     if out.shape != (h, w):
         out = cv2.resize(out, (w, h), interpolation=cv2.INTER_NEAREST)
     return out
 
 
-def _sam_segment(rgb: np.ndarray) -> Optional[np.ndarray]:
+def _sam_segment(rgb: np.ndarray) -> np.ndarray | None:
     """Run SAM 3.1 over the prompts and return a (H, W) uint8 fg mask, or None.
 
     `rgb` is an (H, W, 3) RGB uint8 array. Tries each prompt until one returns a
@@ -257,8 +253,7 @@ def _clean_mask(mask: np.ndarray) -> np.ndarray:
 
     alpha = (binary * 255).astype(np.uint8)
     # Feather: blur then renormalise so the core stays fully opaque.
-    alpha = cv2.GaussianBlur(alpha, (0, 0), sigmaX=2.0)
-    return alpha
+    return cv2.GaussianBlur(alpha, (0, 0), sigmaX=2.0)
 
 
 def _make_cutout(rgb: np.ndarray, alpha: np.ndarray) -> np.ndarray:
@@ -292,7 +287,7 @@ def _make_bg_plate(rgb: np.ndarray, alpha: np.ndarray) -> np.ndarray:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def segment(portrait_path, out_dir: Optional[Path] = None) -> dict:
+def segment(portrait_path, out_dir: Path | None = None) -> dict:
     """Segment a portrait PNG into a character cutout (RGBA) + a background plate.
 
     Args:

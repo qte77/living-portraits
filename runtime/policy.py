@@ -45,6 +45,11 @@ from __future__ import annotations
 
 import math
 from collections import deque
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import random
+    from collections.abc import Callable, Iterable
 
 # Sibling lookup mirrors how the render loop is wired: player.py puts runtime/ on
 # sys.path (bare import), everything else imports the package. Styling is a preference
@@ -91,7 +96,7 @@ REVERSE_FORGIVE = 20       # idle units over which the anti-reverse penalty rela
                            # IS the backtrack. Both guards were right; together they trapped.
 
 
-def _reverse_penalty(dwell=0):
+def _reverse_penalty(dwell: int = 0) -> float:
     """REVERSE_PENALTY at a fresh arrival, relaxing to 1.0 (no penalty) by
     ESCAPE_AFTER + REVERSE_FORGIVE idle units. The pendulum stays fixed; the cell opens."""
     over = (dwell or 0) - ESCAPE_AFTER
@@ -134,7 +139,7 @@ _BAND = {"high": (1.7, 0.75, 1.4), "low": (0.6, 1.4, 0.95)}
 _CONTEXT_NUDGE = {"high": (1.35, 0.75), "low": (0.75, 1.35)}
 
 
-def _mood_bias(mood, band=None):
+def _mood_bias(mood: str | None, band: str | None = None) -> tuple[float, float, float]:
     """`band` is the heartbeat's OWN mapping of its free-text mood onto MOOD_BIAS, decided
     once by the brain that authored the mood (heartbeat._resolve_band) instead of guessed
     here by keyword. When present it wins; when absent this is byte-identical to the
@@ -161,7 +166,7 @@ def _mood_bias(mood, band=None):
     return DEFAULT_MOOD
 
 
-def _style_band(mood, band):
+def _style_band(mood: str | None, band: str | None) -> str | None:
     """The band name `edge_style` should key its manner preference on, or None.
 
     Deliberately the SAME precedence `_mood_bias` uses -- declared band first, then an
@@ -186,7 +191,7 @@ def _style_band(mood, band):
     return None
 
 
-def dist_to_goal(all_edges, goal):
+def dist_to_goal(all_edges: list[dict], goal: str | None) -> dict[str, int]:
     """BFS distance (in transition hops) from every node TO `goal`, over the transition
     sub-graph reversed. {node: hops}. Cheap; computed once per pick when there's a goal."""
     if not goal:
@@ -206,15 +211,20 @@ def dist_to_goal(all_edges, goal):
     return dist
 
 
-def _count(seq, item):
+def _count(seq: Iterable[object], item: object) -> int:
     # recency multiplicity without importing Counter for one lookup
     return sum(1 for x in seq if x == item)
 
 
-def weigh(node, out_edges, all_edges, *, goal=None, mood=None, band=None, route="wander",  # noqa: PLR0912, PLR0915  -- 18 params and 18 branches are intrinsic: one transparent softmax over anti-reverse, novelty, goal-pull, mood, band, weather and manner, and the tests assert on the weights it returns. Splitting it scatters the algorithm away from the live measurements cited at :262-275.
-          exclude=None, prev_node=None, last_id=None, recent_clips=(), recent_nodes=(),
-          reverse_of=None, distmap=None, context_energy=None, styles=None,
-          style_strength=1.0, dwell=0):
+def weigh(node: str, out_edges: list[dict], all_edges: list[dict], *,  # noqa: PLR0912, PLR0915  -- 18 params and 18 branches are intrinsic: one transparent softmax over anti-reverse, novelty, goal-pull, mood, band, weather and manner, and the tests assert on the weights it returns. Splitting it scatters the algorithm away from the live measurements cited at :262-275.
+          goal: str | None = None, mood: str | None = None, band: str | None = None,
+          route: str = "wander", exclude: set[str] | None = None,
+          prev_node: str | None = None, last_id: str | None = None,
+          recent_clips: Iterable[str] = (), recent_nodes: Iterable[str] = (),
+          reverse_of: Callable[[dict], bool] | None = None,
+          distmap: dict[str, int] | None = None, context_energy: str | None = None,
+          styles: dict | None = None, style_strength: float = 1.0,
+          dwell: int = 0) -> list[tuple[dict, float]]:
     """Return [(edge, weight)] for every candidate (transparent -> the tests assert on it).
     `reverse_of(edge) -> bool` optionally marks an edge as the reverse of the last clip
     (label heuristic by default). Excluded edges get weight 0 unless they're the only exits.
@@ -301,7 +311,7 @@ def weigh(node, out_edges, all_edges, *, goal=None, mood=None, band=None, route=
     return weights
 
 
-def _reverse_of_last(last_label):
+def _reverse_of_last(last_label: str | None) -> Callable[[dict], bool]:
     """Heuristic: edges are labelled like 'a2g' (anchor->glower) and 'g2a' (the reverse).
     Mark an edge as the reverse of the last clip if its label is the last label with the
     two sides of '2' swapped. Cheap, no graph metadata needed."""
@@ -312,10 +322,15 @@ def _reverse_of_last(last_label):
     return lambda e: e.get("label") == target
 
 
-def choose(node, out_edges, all_edges, *, goal=None, mood=None, band=None, route="wander",
-           exclude=None, prev_node=None, last_id=None, last_label=None,
-           recent_clips=(), recent_nodes=(), rng, distmap=None, context_energy=None,
-           styles=None, style_strength=1.0, dwell=0):
+def choose(node: str, out_edges: list[dict], all_edges: list[dict], *,
+           goal: str | None = None, mood: str | None = None, band: str | None = None,
+           route: str = "wander", exclude: set[str] | None = None,
+           prev_node: str | None = None, last_id: str | None = None,
+           last_label: str | None = None, recent_clips: Iterable[str] = (),
+           recent_nodes: Iterable[str] = (), rng: random.Random,
+           distmap: dict[str, int] | None = None, context_energy: str | None = None,
+           styles: dict | None = None, style_strength: float = 1.0,
+           dwell: int = 0) -> dict | None:
     """Weighted-sample one edge from `out_edges`. Returns the chosen edge, or None only
     if there are no candidates at all. `context_energy` ("high"|"low"|None) is the live
     weather/time tilt layered on the mood; None = exactly the pre-weather behaviour.

@@ -29,8 +29,12 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from runtime import pathfind
+
+if TYPE_CHECKING:
+    import random
 
 ROOT = Path(__file__).resolve().parent.parent
 MIND_DIR = ROOT / "data" / "mind"
@@ -39,7 +43,7 @@ INTENT_PATH = MIND_DIR / "intent.json"
 DEFAULT_MAX_AGE = 1800.0   # 30 min: ignore a goal older than this (stale brain -> degrade)
 
 
-def load_intent(path=INTENT_PATH):
+def load_intent(path: str | Path = INTENT_PATH) -> dict:
     """Read intent.json -> dict (atomic single-file; tolerant of a missing/half-written
     file -> {}). Cheap enough to call per pick; the caller may mtime-cache it."""
     try:
@@ -48,7 +52,8 @@ def load_intent(path=INTENT_PATH):
         return {}
 
 
-def goal_for(intent, character, now=None, max_age=DEFAULT_MAX_AGE):
+def goal_for(intent: dict, character: str, now: float | None = None,
+             max_age: float = DEFAULT_MAX_AGE) -> str | None:
     """The fresh goal node for `character`, or None. A goal with no/old `set_at` is
     treated as stale and ignored (so a stopped heartbeat releases the character)."""
     c = (intent or {}).get("characters", {}).get(character) or {}
@@ -66,8 +71,9 @@ def goal_for(intent, character, now=None, max_age=DEFAULT_MAX_AGE):
     return goal
 
 
-def decide(character, node, out_edges, all_edges, last_id, intent, rng,  # noqa: PLR0917  -- the walker's whole decision context; 9 positionals mirror policy.weigh's call site exactly
-           now=None, max_age=DEFAULT_MAX_AGE):
+def decide(character: str, node: str, out_edges: list[dict], all_edges: list[dict],  # noqa: PLR0917  -- the walker's whole decision context; 9 positionals mirror policy.weigh's call site exactly
+           last_id: str | None, intent: dict, rng: random.Random,
+           now: float | None = None, max_age: float = DEFAULT_MAX_AGE) -> dict:
     """Return one of:
         {"action": "force", "edge": e}   play exactly this edge (a step toward, or an
                                          idle hold at, the goal)

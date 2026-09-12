@@ -21,7 +21,7 @@ from __future__ import annotations
 from collections import deque
 
 
-def _adjacency(all_edges):
+def _adjacency(all_edges: list[dict]) -> dict[str, list[dict]]:
     """node -> [transition edges leaving it]. Idle self-loops are ignored: they do
     not move the character, so they are never part of a path between two poses."""
     adj = {}
@@ -31,7 +31,8 @@ def _adjacency(all_edges):
     return adj
 
 
-def next_step(all_edges, start, goal, adj=None):
+def next_step(all_edges: list[dict], start: str | None, goal: str | None,
+              adj: dict[str, list[dict]] | None = None) -> dict | None:
     """The FIRST transition edge on a shortest path start -> goal, or None if we're
     already there / there is no path. BFS guarantees the fewest hops; ties broken by
     edge declaration order (deterministic given the edge list)."""
@@ -60,7 +61,8 @@ def next_step(all_edges, start, goal, adj=None):
     return None
 
 
-def shortest_path(all_edges, start, goal, adj=None):
+def shortest_path(all_edges: list[dict], start: str | None, goal: str | None,
+                   adj: dict[str, list[dict]] | None = None) -> list[str]:
     """The full node sequence [start, ..., goal] on a shortest path, or [] if
     unreachable. For logging / the heartbeat's reasoning, not the hot loop."""
     if start is None or goal is None:
@@ -82,7 +84,8 @@ def shortest_path(all_edges, start, goal, adj=None):
     return []
 
 
-def hops_from(all_edges, start, adj=None):
+def hops_from(all_edges: list[dict], start: str | None,
+              adj: dict[str, list[dict]] | None = None) -> dict[str, int]:
     """{node: transition hops from `start`}, including {start: 0}. Unreachable nodes are
     absent. One BFS, used as the RELEVANCE metric for journal retrieval: a memory made
     two steps from where the character stands is nearer than one across the graph, and
@@ -102,7 +105,8 @@ def hops_from(all_edges, start, adj=None):
     return dist
 
 
-def reachable_poses(all_edges, start, adj=None):
+def reachable_poses(all_edges: list[dict], start: str | None,
+                     adj: dict[str, list[dict]] | None = None) -> set[str]:
     """The set of poses reachable from `start` via transitions (excluding `start`).
     The heartbeat constrains the LLM's goal choice to this set so it can never pick
     a pose the body cannot actually walk to."""

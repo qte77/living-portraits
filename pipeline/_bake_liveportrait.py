@@ -293,7 +293,7 @@ def _load_liveportrait():
     # InferenceConfig's checkpoint_{F,G,M,S,W} are RELATIVE to the repo root, so models load
     # correctly only with cwd == the repo. Restore cwd afterward so this bake's manifest/clip
     # writes still land under living-portraits (GEN/OUT are absolute, but the manifest may not be).
-    cwd0 = os.getcwd()
+    cwd0 = Path.cwd()
     os.chdir(lp)
     try:
         from src.config.inference_config import InferenceConfig
@@ -322,7 +322,7 @@ def bake_behavior(wrapper, get_rotation_matrix, anchor_rgb: np.ndarray,
     d_exp) + (t + d_t), stitched, warp-decoded, parsed to uint8.
 
     # VERIFY: the exact tensor shapes/keys (kp vs transform_keypoint output, exp flattening,
-    # stitching/​warp_decode signatures) are from the public source and UNVERIFIED on hil.
+    # stitching/\u200bwarp_decode signatures) are from the public source and UNVERIFIED on hil.
     """
     import torch
 

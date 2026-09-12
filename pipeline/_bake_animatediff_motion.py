@@ -133,7 +133,7 @@ def main():
     graph = ClipGraph.load(manifest)
 
     if torch.cuda.is_available():
-        f, t = torch.cuda.mem_get_info()
+        f, _t = torch.cuda.mem_get_info()
         print("vram_free_GB %.2f" % (f / 1e9), flush=True)
     pipe = build_pipe(args.ip_scale)
 

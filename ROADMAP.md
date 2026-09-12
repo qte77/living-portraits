@@ -166,8 +166,8 @@ From the map's risk ranking, not from a desire for coverage.
 - **Reflection nodes** (audit #3, research #4): nightly summaries appended to the same JSONL as
   `kind: "reflection"`, triggered by a mood-band shift or a broken repetition run rather than the
   clock ([2604.12285](https://arxiv.org/abs/2604.12285)).
-- **Seraphina.** One node, no panel, and Phineas's designated rival. Either hang a third panel or
-  admit MAXX is the rival — right now the persona prose and the topology disagree.
+- **Seraphina.** No second daytime pose, no panel, and Phineas's designated rival. Either hang a
+  third panel or admit MAXX is the rival — right now the persona prose and the topology disagree.
 - **Re-seed `context-graphs`.** One query (`graph memory consolidation summarization node`) was
   lost to an S2 429, and it is exactly the consolidation literature the reflection work needs.
 - **Fix `seed_papers` pinning.** GraphRAG (`2404.16130`) was a declared seed paper and did not

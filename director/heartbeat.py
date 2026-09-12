@@ -276,7 +276,11 @@ def _neighbour_lines(character, now=None):
                            % (_display_name(other), pose, mood))
             else:
                 out.append("On the wall beside you, %s is at %s." % (_display_name(other), pose))
-        except Exception:
+        except Exception as e:
+            # Fail-open stays: one bad neighbour file must not blank the whole
+            # awareness line. But a corrupt/unreadable pose.json used to disappear
+            # with no trace, indistinguishable from "that panel has nothing to say".
+            print("_neighbour_lines: skipping %s -- %r" % (other, e), flush=True)
             continue
     return out
 

@@ -21,8 +21,13 @@ strands the walk.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 
-def in_window(hour, bedtime_hour, wake_hour):
+if TYPE_CHECKING:
+    import random
+
+
+def in_window(hour: float, bedtime_hour: float, wake_hour: float) -> bool:
     """Is `hour` within [bedtime, wake), wrapping past midnight? e.g. 21->5 means
     21,22,23,0,1,2,3,4 are night; 0->5 means 0,1,2,3,4 are night."""
     hour %= 24
@@ -33,11 +38,11 @@ def in_window(hour, bedtime_hour, wake_hour):
     return hour >= bedtime_hour or hour < wake_hour   # wraps midnight
 
 
-def _routine(spec, character):
+def _routine(spec: dict | None, character: str) -> dict | None:
     return (spec or {}).get("characters", {}).get(character)
 
 
-def is_night(spec, character, hour):
+def is_night(spec: dict, character: str, hour: float) -> bool:
     cs = _routine(spec, character)
     if not cs:
         return False
@@ -48,7 +53,8 @@ def is_night(spec, character, hour):
     return in_window(hour, bt, wk)
 
 
-def _chain(cs):
+def _chain(cs: dict) -> tuple[dict[str, str], dict[str, str], dict[str, list[str]],
+                              dict[str, int | None], str | None, set[str]]:
     """From the routine, build the linear transition chain + per-pose idle/dwell info.
     Returns (fwd, back, idles_at, dwell_at, sleep_pose, labels):
       fwd[pose]      = forward transition LABEL leaving `pose` toward sleep
@@ -77,12 +83,12 @@ def _chain(cs):
     return fwd, back, idles_at, dwell_at, sleep_pose, labels
 
 
-def bedtime_labels(spec, character):
+def bedtime_labels(spec: dict | None, character: str) -> set[str]:
     cs = _routine(spec, character)
     return _chain(cs)[5] if cs else set()
 
 
-def bedtime_poses(spec, character):
+def bedtime_poses(spec: dict | None, character: str) -> set[str]:
     """Full node-ids of the poses that belong to the bedtime routine, so the DAYTIME
     brain (heartbeat) can keep them off its goal menu (you don't decide to go to bed at
     noon -- the clock decides that). Excludes the hub, which is a normal daytime pose."""
@@ -95,7 +101,7 @@ def bedtime_poses(spec, character):
     return {character + ":" + p for p in poses}
 
 
-def sleep_node(spec, character):
+def sleep_node(spec: dict | None, character: str) -> str | None:
     """The '<char>:<sleep_pose>' the routine dwells at overnight (e.g. phineas:sleep,
     maxx:pod), or None. The walker uses this to give sleep idles a longer hold."""
     cs = _routine(spec, character)
@@ -105,7 +111,7 @@ def sleep_node(spec, character):
     return (character + ":" + sp) if sp else None
 
 
-def _find(out_edges, label):
+def _find(out_edges: list[dict], label: str | None) -> dict | None:
     """First edge whose `label` matches (build() sets label=<label> on every edge).
     With variants there may be several; pick one at random-ish (the first) -- the caller's
     rng handles variety across picks since pose_dwell advances."""
@@ -117,14 +123,16 @@ def _find(out_edges, label):
     return None
 
 
-def _pick_idle(out_edges, ids, last_id, rng):
+def _pick_idle(out_edges: list[dict], ids: list[str], last_id: str | None,
+               rng: random.Random) -> dict | None:
     """A random idle edge whose label is in `ids`, avoiding an immediate repeat."""
     pool = [e for e in out_edges if e.get("kind") == "idle" and e.get("label") in ids]
     fresh = [e for e in pool if e.get("id") != last_id] or pool
     return rng.choice(fresh) if fresh else None
 
 
-def decide(spec, character, node, out_edges, pose_dwell, last_id, hour, rng):
+def decide(spec: dict | None, character: str, node: str, out_edges: list[dict],
+           pose_dwell: int, last_id: str | None, hour: float, rng: random.Random) -> dict:
     cs = _routine(spec, character)
     if not cs:
         return {"action": "none"}
@@ -160,6 +168,6 @@ def decide(spec, character, node, out_edges, pose_dwell, last_id, hour, rng):
     return {"action": "normal", "exclude": labels}
 
 
-def labels_poses(idles_at, dwell_at):
+def labels_poses(idles_at: dict, dwell_at: dict) -> set[str]:
     """The set of poses that belong to the routine (have an idle/dwell beat)."""
     return set(idles_at) | set(dwell_at)

@@ -88,14 +88,14 @@ lp-mind     (AtLogon, long-lived process; NIGHT_INTERVAL 900s / DEFAULT_INTERVAL
   pythonw director/heartbeat.py --chars phineas,maxx --quiet --propose-every 8
 
   every ~4 min (heartbeat.py:70, :615-631):
-    tick()                              heartbeat.py:749
-      _ensure_player()                  heartbeat.py:733   (schtasks /Run lp-preview — backstop)
-      per character: decide_character() heartbeat.py:494
+    tick()                              heartbeat.py:753
+      _ensure_player()                  heartbeat.py:737   (schtasks /Run lp-preview — backstop)
+      per character: decide_character() heartbeat.py:499
         read pose/<char>.json + journal tail (5 lines, :72)
         GLM call via director/llm.py    heartbeat.py:327
         write intent.json (atomic)      heartbeat.py:571
         append journal/<char>.jsonl     heartbeat.py:222
-    every 8th tick: propose_pose()      heartbeat.py:625   -> proposals.json (status=pending)
+    every 8th tick: propose_pose()      heartbeat.py:630   -> proposals.json (status=pending)
 
 lp-gen      (time trigger, repeat PT20M)
   pythonw pipeline/autogen.py generate --auto --limit 1
@@ -234,7 +234,7 @@ All of `data/` is gitignored (`.gitignore:2`). On hil the real files live at
 | File | Writer | Readers | Atomic? | If a second writer appears |
 |---|---|---|---|---|
 | `data/mind/intent.json` | **heartbeat only** (`heartbeat.py:571` via `_atomic_write` `:118`) | walker (`_preview_graph.py:126-138`), mtime-cached | yes (tmp + `os.replace`) | last-write-wins clobbers the other character's goal — `tick()` deliberately re-reads and merges (`heartbeat.py:546-550`) so it can drive a subset; a second *process* defeats that |
-| `data/mind/pose/<char>.json` | **that character's walker only** (`_preview_graph.py:148-156`) | heartbeat (`heartbeat.py:182`) | yes | per-character path is why two panels don't race. One file for both characters would have raced; the split is the fix |
+| `data/mind/pose/<char>.json` | **that character's walker only** (`_preview_graph.py:148-156`) | heartbeat (`heartbeat.py:182`) | yes | both panels' `GraphCycler`s already run sequentially in `_preview_graph.py`'s one `main()` loop, so there is no concurrent write to race in the first place today; the per-character path is what keeps it that way if a panel ever moves to its own process |
 | `data/mind/journal/<char>.jsonl` | heartbeat, append-only — decisions AND (v0.4.0) nightly `kind: "reflection"` lines from `director/reflect.py` | heartbeat via `journal_score.select` (SCORED retrieval since v0.3.0, not the last 5) | **no** — plain append | concurrent appends can interleave a line; readers skip unparsable lines (`:217-218`) so it degrades rather than breaks |
 | `data/clips/video_graph.json` | `video_graph.build()` (`video_graph.py:584`, `save()` `:54-61`) — driven by `lp-gen` | walker (hot-reload), heartbeat, pathfind | yes | a torn read is impossible by construction; two concurrent builds are prevented by the autogen lock, not by the file |
 | `data/mind/proposals.json` | `autogen.add_proposal` / `set_status` (`:142`, `:157`) — heartbeat proposes, worker transitions | both | yes (`_save` `:130`) | **read-modify-write, not locked.** Heartbeat appending while the worker sets a status can lose one side's edit. The 20-min/4-min cadences make the collision rare, not impossible **(inferred: I found no lock on this file)** |

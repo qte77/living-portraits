@@ -74,7 +74,7 @@ def main():
     print("LTX FLF2V slug=%s seed=%d frames=%d (anchor pinned at 0 and %d)" % (
         args.slug, args.seed, args.frames, last), flush=True)
     if torch.cuda.is_available():
-        f, t = torch.cuda.mem_get_info()
+        f, _t = torch.cuda.mem_get_info()
         print("vram_free_GB %.2f" % (f / 1e9), flush=True)
 
     t0 = time.time()
