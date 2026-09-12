@@ -14,7 +14,7 @@ one, written against the live production host with every claim cited
 ## Orient first
 
 ```bash
-python -m pip install -r requirements.txt
+uv sync
 python -m pytest tests/ -q                 # expect: 303 passed, 41 skipped
 python scripts/seed_demo_media.py          # placeholder media, ~118 files
 python runtime/video_graph.py build        # expect: 20 nodes, 98 edges, 0 errors

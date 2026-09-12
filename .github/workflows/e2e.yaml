@@ -18,7 +18,7 @@
 # measured at 16 findings before the fix and 0 after.
 #
 # Playwright is pulled in per-run with `uvx --with`, never added to
-# requirements.txt, so the walker's near-stdlib dependency contract is untouched
+# pyproject.toml, so the walker's near-stdlib dependency contract is untouched
 # by a browser-testing tool.
 
 name: e2e
@@ -40,19 +40,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
+      # No enable-cache here: this job's post-run cache-prune step was observed hanging
+      # ~5 minutes then failing with exit code 2 on a green run (the actual job -- "Drive
+      # the viewer", 0 findings -- had already succeeded and uploaded its artifact by
+      # then), turning a passing e2e run into a red check. This job already has its own
+      # Chromium cache below; a uv package cache here is a minor win not worth that risk.
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
 
       - name: Set up Python
         run: uv python install 3.13
 
       - name: Install project dependencies
-        run: |
-          uv venv
-          uv pip install -r requirements.txt
+        run: uv sync
 
       # The viewer reads one exported JSON, and data/ is gitignored, so the
       # artifact has to be built before there is anything to look at. This is
@@ -66,7 +67,7 @@ jobs:
       # Chromium is the expensive part of this job. Cache it so a rerun that
       # changes nothing does not re-download 114 MB.
       - name: Cache Chromium
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-v1
@@ -96,7 +97,7 @@ jobs:
       # that the page's own rendering is the evidence.
       - name: Upload screenshots and findings
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: e2e-viewer-${{ github.run_id }}
           path: |

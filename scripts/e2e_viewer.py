@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """e2e_viewer.py -- drive graph_viewer.html in a real browser and report what breaks.
 
-Needs only Playwright, which it does not add to requirements.txt:
+Needs only Playwright, which it does not add to pyproject.toml:
 
     uvx --with playwright python scripts/e2e_viewer.py <base-url> <out-dir>
 

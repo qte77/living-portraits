@@ -26,9 +26,9 @@ so a fresh clone seeds its own placeholders and runs everything from there.
 ```bash
 git clone https://github.com/Immersive-commons/living-portraits.git
 cd living-portraits
-python -m pip install -r requirements.txt
+uv sync
 
-python -m pytest tests/            # 303 passed, 41 skipped on a bare clone
+uv run python -m pytest tests/     # 303 passed, 41 skipped on a bare clone
 python scripts/seed_demo_media.py  # placeholder stills + loops, 118 files
 python runtime/video_graph.py build        # -> 20 nodes, 98 edges, walk-safe
 python scripts/export_context_view.py      # -> data/graph/context_view.json
@@ -86,8 +86,8 @@ hidden failures:
   reason rather than quietly re-running on fixtures.
 - **dependency degradation** — anything needing a library you did not install.
   One of these is worth naming, because it used to make the documented count
-  wrong: `test_otel` needs `opentelemetry-sdk`, which is deliberately **not** in
-  `requirements.txt` (`director/otel.py` is fail-open, so the system does not
+  wrong: `test_otel` needs `opentelemetry-sdk`, which is deliberately **not** a
+  `pyproject.toml` dependency (`director/otel.py` is fail-open, so the system does not
   need it). Install it and you get 304 passed / 40 skipped. Without it — which
   is what following the setup above gives you — it is 303 / 41. Both are green.
 
@@ -106,8 +106,8 @@ hidden failures:
 | `prompts/` | Character specs (`characters/*.json`), the bedtime routine, stage directives. |
 | `graph_viewer.html` | The six-lens viewer. Reads one exported JSON; `scripts/live_view.py` keeps that JSON current while a walk is in progress. |
 | `panels.yaml` | Panel geometry and palette. Moving a panel is a config change, not a code change. |
-| `ruff.toml` | The single linter's config. Every `ignore` names a decision in AGENTS.md; complexity is justified at each function, never raised here. |
-| `requirements.lock` | `uv pip compile --universal` of the above, `win32` markers included. CI installs from it; `requirements.txt` stays the contract. |
+| `pyproject.toml` | Dependencies, packaging, and the single linter's config (`[tool.ruff]`). Every `ignore` names a decision in AGENTS.md; complexity is justified at each function, never raised here. |
+| `uv.lock` | The exact resolution, `win32` markers included. `uv sync` installs from it; `pyproject.toml` stays the contract. |
 | `.github/workflows/` | `ci.yaml` runs the four-command chain and holds the test counts as floors. `e2e.yaml` drives the viewer in a real browser on pull requests. |
 
 ## Where to read next

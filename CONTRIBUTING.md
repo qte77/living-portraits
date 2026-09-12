@@ -5,7 +5,7 @@
 ```bash
 git clone https://github.com/Immersive-commons/living-portraits.git
 cd living-portraits
-python -m pip install -r requirements.txt
+uv sync
 python -m pytest tests/ -q          # 303 passed, 41 skipped on a bare clone
 ```
 

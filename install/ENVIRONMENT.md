@@ -78,7 +78,7 @@ Fail-open by design; the whole subsystem is optional.
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | Standard OTLP endpoint |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | — | Traces-specific endpoint; either turns the exporter on |
 
-`opentelemetry-sdk` is deliberately **not** in `requirements.txt`. Install it and the
+`opentelemetry-sdk` is deliberately **not** a `pyproject.toml` dependency. Install it and the
 suite reports 304/40 instead of a bare clone's 303/41.
 
 ## Operator tools — `scripts/`
