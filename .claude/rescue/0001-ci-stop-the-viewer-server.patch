@@ -1,0 +1,89 @@
+From 5d7a7322ddf025240510359a827d7e8ed879878b Mon Sep 17 00:00:00 2001
+From: qte77 <93844790+qte77@users.noreply.github.com>
+Date: Wed, 9 Sep 2026 01:02:43 +0000
+Subject: [PATCH] ci: stop the viewer server so the job can finish
+
+Every e2e run since #29 has been red, and not because of the viewer. The
+job passed its browser test and then hung at setup-uv's cache post-step
+until the 25-minute timeout killed it, leaving an empty findings.json as
+the only evidence -- which is a diagnosis that costs someone an artifact
+download to reach.
+
+The cause is the backgrounded server, not the cache. A background child
+inherits the step's stdout and stderr pipes; the runner reads those pipes
+and does not stop while a writer holds them open. Reproduced locally by
+emulating a step as a pipe read to EOF: unredirected, the pipe is still
+open after 4s; redirected to a file, it closes in 0.01s.
+
+So: send the server's output to server.log (closes the inherited pipes),
+record its PID to a file (steps are separate shells, $! does not survive),
+and kill exactly that PID in an always() teardown before the upload. The
+teardown never fails the run -- the server has done its work by then and
+its exit status says nothing about the page. server.log now ships with the
+artifact, for the case where serving is what broke.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Rp3f3efgmitmDmxgBmKaVs
+---
+ .github/workflows/e2e.yaml | 30 +++++++++++++++++++++++++++++-
+ 1 file changed, 29 insertions(+), 1 deletion(-)
+
+diff --git a/.github/workflows/e2e.yaml b/.github/workflows/e2e.yaml
+index 0c67618..09461ce 100644
+--- a/.github/workflows/e2e.yaml
++++ b/.github/workflows/e2e.yaml
+@@ -76,9 +76,25 @@ jobs:
+         # twenty-minute detour to discover by hand.
+         run: uvx --with playwright playwright install --with-deps chromium
+ 
++      # Two things here are load-bearing and neither is obvious.
++      #
++      # 1. The redirect. A backgrounded process inherits the step's stdout and
++      #    stderr pipes. The runner reads those pipes to stream logs, and it does
++      #    not stop reading while a writer is still open -- so a server that
++      #    outlives its step holds the job open at the NEXT step that waits on
++      #    process state. Here that was setup-uv's cache post-step, which hung
++      #    until the 25-minute timeout killed the job, on every run: the viewer
++      #    test itself passed and the run was still red, with an empty
++      #    findings.json as the only evidence. Sending the server's output to a
++      #    file closes the inherited pipes.
++      #
++      # 2. The PID file. Steps are separate shells, so $! does not survive; the
++      #    teardown below reads it back to kill exactly this process rather than
++      #    pkill-ing anything that looks like an http.server.
+       - name: Serve the viewer
+         run: |
+-          uv run python -m http.server 8000 --bind 127.0.0.1 &
++          uv run python -m http.server 8000 --bind 127.0.0.1 > server.log 2>&1 &
++          echo $! > server.pid
+           for i in $(seq 1 30); do
+             curl -sf -o /dev/null http://127.0.0.1:8000/graph_viewer.html && break
+             sleep 1
+@@ -92,6 +108,17 @@ jobs:
+           uvx --with playwright python scripts/e2e_viewer.py \
+             http://127.0.0.1:8000 "$PWD/e2e_out"
+ 
++      # Always, and before the artifact upload, so a failing viewer test still
++      # leaves a job that can finish. Never fails the run: the server has done
++      # its work by this point and its exit status says nothing about the page.
++      - name: Stop the viewer server
++        if: always()
++        run: |
++          if [ -f server.pid ]; then
++            kill "$(cat server.pid)" 2>/dev/null || true
++            rm -f server.pid
++          fi
++
+       # Always: on a failure the screenshots ARE the report -- the whole point is
+       # that the page's own rendering is the evidence.
+       - name: Upload screenshots and findings
+@@ -103,5 +130,6 @@ jobs:
+             e2e_out/**/*.png
+             e2e_out/**/*.webm
+             e2e_out/findings.json
++            server.log
+           retention-days: 14
+           if-no-files-found: warn
+-- 
+2.55.0
+
