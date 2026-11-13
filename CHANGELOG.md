@@ -18,6 +18,8 @@ had been hiding. Four PRs (#1, #5, #6, #7 on this fork), grounded and verified a
 than assumed.
 
 ### Added
+- **CodeQL workflow** (`.github/workflows/codeql.yaml`) scanning `python` and `actions` on every
+  push, weekly and on demand; actions pinned to full commit SHAs.
 - **`pyproject.toml` replaces `requirements.txt`/`requirements.lock`/`ruff.toml`.** One file:
   hatchling packaging (`director/pipeline/health/scripts` are now real packages), the dependency
   floors that used to live in `requirements.txt`, and `ruff.toml`'s entire `[lint]` table folded
