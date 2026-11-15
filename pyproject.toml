@@ -39,7 +39,7 @@ dependencies = [
 # one contributor-facing loop here (AGENTS.md / CONTRIBUTING.md), so one group.
 dev = [
   "pytest>=8.0",
-  "ruff==0.16.6",   # pinned to match .claude/bench.py's uvx invocation
+  "ruff==0.17.4",   # pinned to match .claude/bench.py's uvx invocation
 ]
 
 # The clip-generation stack. Unpinned on purpose -- requirements-gen.txt's own
